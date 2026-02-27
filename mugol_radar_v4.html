@@ -1,0 +1,1910 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚨 MuGöl Sismik Radar | Premium</title>
+    
+    <!-- Nunito Yazı Tipi -->
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Harita (Leaflet.js) Kütüphaneleri -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Leaflet MarkerCluster -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <!-- Leaflet Heatmap -->
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+    <style>
+        :root {
+            /* Premium Dark Tema Renkleri */
+            --bg-dark: #050505;
+            --panel-bg: rgba(15, 15, 18, 0.75);
+            --text-main: #f4f4f5;
+            --text-muted: #a1a1aa;
+            --accent: #d4af37; /* Premium Altın */
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --success: #10b981;
+            --location: #3b82f6;
+            --border: rgba(255, 255, 255, 0.08);
+            --tool-bg: rgba(255, 255, 255, 0.04);
+            --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Nunito', sans-serif; }
+        
+        body { 
+            background: radial-gradient(circle at top left, #121217 0%, var(--bg-dark) 100%);
+            color: var(--text-main); 
+            height: 100vh; 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+        }
+
+        /* Özel Kaydırma Çubuğu */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+        /* Üst Bilgi */
+        header { 
+            background: var(--panel-bg); 
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 15px 30px; 
+            border-bottom: 1px solid var(--border); 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            position: relative; 
+            z-index: 1000; 
+            box-shadow: var(--glass-shadow); 
+        }
+        
+        .logo { 
+            font-size: 26px; 
+            font-weight: 900; 
+            color: var(--text-main); 
+            display: flex; 
+            align-items: center; 
+            gap: 8px; 
+            letter-spacing: 0.5px;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+        }
+        .logo span { 
+            color: var(--accent); 
+            font-size: 16px; 
+            font-weight: 700; 
+            letter-spacing: 1px; 
+            text-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
+        }
+
+        /* Yenileme Geri Sayım Çubuğu */
+        #progressContainer { width: 100%; height: 2px; background: transparent; position: absolute; bottom: 0; left: 0; }
+        #progressBar { height: 100%; width: 0%; background: var(--accent); transition: width 1s linear; box-shadow: 0 0 10px var(--accent); }
+
+        /* Sağ Üst Hamburger Menü Butonu */
+        .menu-btn {
+            background: var(--tool-bg); 
+            color: var(--text-main); 
+            border: 1px solid var(--border); 
+            padding: 10px;
+            border-radius: 12px; 
+            cursor: pointer; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            backdrop-filter: blur(10px);
+            flex-shrink: 0;
+        }
+        .menu-btn:hover { 
+            background: rgba(255, 255, 255, 0.1); 
+            border-color: var(--accent); 
+            color: var(--accent); 
+            transform: scale(1.05) rotate(3deg); 
+        }
+
+        /* SAĞDAN AÇILIR MENÜ (OFFCANVAS) */
+        .settings-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); z-index: 10001; opacity: 0; pointer-events: none; transition: 0.4s;
+            backdrop-filter: blur(4px);
+        }
+        .settings-overlay.active { opacity: 1; pointer-events: auto; }
+
+        .settings-panel {
+            position: fixed; top: 0; right: -350px; width: 340px; height: 100vh;
+            background: rgba(15, 15, 18, 0.95); z-index: 10002; transition: right 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+            box-shadow: -10px 0 40px rgba(0,0,0,0.8); display: flex; flex-direction: column; border-left: 1px solid var(--border);
+            backdrop-filter: blur(30px);
+        }
+        .settings-panel.active { right: 0; }
+
+        .settings-header {
+            padding: 25px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: transparent;
+        }
+        .settings-header h2 { font-size: 18px; font-weight: 800; color: var(--accent); letter-spacing: 0.5px; }
+        .close-btn { background: transparent; border: none; color: var(--text-muted); font-size: 24px; font-weight: bold; cursor: pointer; transition: 0.2s; line-height: 1; }
+        .close-btn:hover { color: var(--danger); transform: scale(1.1) rotate(90deg); }
+
+        .settings-content { padding: 25px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; flex: 1; }
+
+        /* Menü İçi Araçlar */
+        .control-group-vertical { display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        select, input[type="text"], input[type="number"] {
+            background: rgba(0, 0, 0, 0.4); color: white; border: 1px solid var(--border); width: 100%;
+            padding: 12px 15px; border-radius: 10px; outline: none; transition: all 0.3s; font-weight: 600; font-size: 14px;
+        }
+        select:focus, input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2); background: rgba(0,0,0,0.6); }
+
+        .btn-location {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; border: none; padding: 14px; width: 100%;
+            border-radius: 10px; font-weight: 800; font-size: 14px; cursor: pointer; 
+            display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
+        }
+        .btn-location:hover { background: linear-gradient(135deg, #3b82f6, #2563eb); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(37, 99, 235, 0.6); }
+
+        .btn-tool {
+            background: var(--tool-bg); color: var(--text-main); border: 1px solid var(--border); padding: 12px; width: 100%;
+            border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 13px; transition: 0.3s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn-tool:hover { background: rgba(255,255,255,0.08); border-color: var(--accent); }
+        .btn-tool.active { background: rgba(16, 185, 129, 0.15); color: var(--success); border-color: var(--success); }
+        
+        .tools-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+        /* İstatistik Çubuğu & Dağılım Çubuğu */
+        .stats-bar { 
+            background: rgba(9, 9, 11, 0.5); 
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 12px 30px; display: flex; flex-wrap: wrap; gap: 15px 40px; border-bottom: 1px solid var(--border); 
+            font-size: 14px; position: relative; z-index: 999; align-items: center;
+        }
+        .stat-item { display: flex; gap: 8px; align-items: center; font-weight: 600; color: var(--text-muted); }
+        .stat-value { font-weight: 900; color: var(--text-main); font-size: 16px; }
+        .stat-value.danger { color: var(--danger); }
+        
+        /* Şiddet Dağılım Grafiği (YENİ EKLENTİ) */
+        .dist-wrapper { flex-basis: 100%; margin-top: 5px; }
+        .dist-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); margin-bottom: 5px; font-weight: 700;}
+        .mag-dist-container { width: 100%; height: 6px; background: rgba(255,255,255,0.05); display: flex; border-radius: 4px; overflow: hidden; }
+        .mag-dist-bar { height: 100%; transition: width 0.8s cubic-bezier(0.25, 0.8, 0.25, 1); }
+
+        /* Kaydırma ve Alanlar */
+        .dashboard { display: flex; flex: 1; min-height: 0; position: relative; }
+
+        /* Sol Liste (Depremler) */
+        .sidebar { 
+            width: 440px; 
+            background: rgba(9, 9, 11, 0.85); 
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-right: 1px solid var(--border); 
+            display: flex; flex-direction: column; min-height: 0; position: relative; z-index: 998; 
+            box-shadow: 10px 0 30px rgba(0,0,0,0.5); 
+        }
+        
+        .sidebar-header { padding: 20px 25px; background: transparent; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+        .sidebar-header-title { font-weight: 800; color: var(--accent); font-size: 15px; }
+        
+        .status-indicator { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); font-weight: 800; text-transform: uppercase; }
+        .status-dot { height: 10px; width: 10px; background-color: var(--success); border-radius: 50%; box-shadow: 0 0 12px var(--success); animation: blink 1.5s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        .eq-list { flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 50px; display: flex; flex-direction: column; gap: 15px; scroll-behavior: smooth; }
+
+        /* Deprem Kartları */
+        .eq-card {
+            background: rgba(255, 255, 255, 0.02); padding: 16px; border-radius: 12px;
+            display: flex; align-items: center; gap: 15px; border: 1px solid rgba(255,255,255,0.05); border-left: 4px solid gray;
+            cursor: pointer; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); position: relative; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        .eq-card:hover { transform: translateY(-3px); background: rgba(255, 255, 255, 0.05); box-shadow: 0 8px 25px rgba(0,0,0,0.4); }
+        
+        /* Yeni Deprem Vurgusu */
+        .eq-new { animation: borderPulse 2.5s infinite; }
+        @keyframes borderPulse { 0% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.3); } 70% { box-shadow: 0 0 0 8px rgba(212, 175, 55, 0); } 100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0); } }
+
+        .eq-mag { font-size: 28px; font-weight: 900; width: 65px; text-align: center; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+        .eq-details { flex: 1; overflow: hidden; }
+        .eq-place { 
+            font-size: 15px; font-weight: 800; margin-bottom: 8px; line-height: 1.4; color: var(--text-main);
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis;
+        }
+        .eq-meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px; color: var(--text-muted); font-weight: 700; align-items: center; }
+        
+        /* Etiketler */
+        .eq-source { background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 6px; color: var(--accent); border: 1px solid rgba(255,255,255,0.1); }
+        .eq-depth { background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 6px; color: #cbd5e1; }
+        .eq-distance { background: linear-gradient(135deg, #1e40af, #3b82f6); padding: 4px 8px; border-radius: 6px; color: #fff; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3); }
+        .eq-intensity { background: linear-gradient(135deg, #581c87, #9333ea); padding: 4px 8px; border-radius: 6px; color: #fff; box-shadow: 0 2px 8px rgba(147, 51, 234, 0.3);}
+        .eq-closest { background: linear-gradient(135deg, #14532d, #16a34a); padding: 4px 8px; border-radius: 6px; color: #fff; font-weight: 900; box-shadow: 0 2px 8px rgba(22, 163, 74, 0.3);}
+        .eq-badge-new { background: var(--accent); color: #000; padding: 4px 8px; border-radius: 6px; font-weight: 900; letter-spacing: 0.5px; box-shadow: 0 2px 8px rgba(212, 175, 55, 0.4);}
+        .eq-risk-warning { background: linear-gradient(135deg, #9a3412, #ea580c); padding: 4px 8px; border-radius: 6px; color: #fff; font-weight: 900; animation: pulse-banner 1.5s infinite;}
+        .eq-risk-danger { background: linear-gradient(135deg, #881337, #e11d48); padding: 4px 8px; border-radius: 6px; color: #fff; font-weight: 900; animation: pulse-banner 1s infinite;}
+        @keyframes pulse-banner { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+
+        /* Harita Alanı */
+        #map { flex: 1; background: #000; z-index: 1; position: relative; }
+        
+        /* Harita Lejantı (YENİ EKLENTİ) */
+        .map-legend { 
+            position: absolute; bottom: 30px; right: 20px; z-index: 1000; 
+            background: rgba(15, 15, 18, 0.85); backdrop-filter: blur(15px); 
+            padding: 15px; border-radius: 12px; border: 1px solid var(--border); 
+            box-shadow: var(--glass-shadow); display: flex; flex-direction: column; gap: 8px; 
+            font-size: 12px; font-weight: 800; color: var(--text-main); pointer-events: none;
+        }
+        .legend-item { display: flex; align-items: center; gap: 10px; }
+        .legend-color { width: 14px; height: 14px; border-radius: 50%; box-shadow: 0 0 5px rgba(255,255,255,0.2); }
+
+        /* Leaflet Özel Popup Premium Stil */
+        .leaflet-popup-content-wrapper { 
+            background: rgba(15, 15, 18, 0.95) !important; 
+            backdrop-filter: blur(15px);
+            color: var(--text-main); 
+            border: 1px solid var(--border); 
+            box-shadow: 0 15px 35px rgba(0,0,0,0.8); 
+            border-radius: 16px; 
+            font-family: 'Nunito', sans-serif; 
+        }
+        .leaflet-popup-tip { background: rgba(15, 15, 18, 0.95) !important; }
+        .leaflet-popup-content { margin: 18px; }
+        .popup-title { font-size: 15px; font-weight: 800; color: #e2e8f0; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        .popup-row { display: flex; justify-content: space-between; gap: 20px; margin-bottom: 8px; font-size: 13px; font-weight: 600; color: #a1a1aa; }
+        .popup-val { color: var(--text-main); font-weight: 800; text-align: right; }
+        
+        /* Paylaş Butonu (YENİ EKLENTİ) */
+        .popup-share-btn { 
+            background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--text-main); 
+            padding: 8px; border-radius: 8px; cursor: pointer; margin-top: 12px; width: 100%; 
+            font-weight: 800; transition: all 0.3s; display: flex; justify-content: center; align-items: center; gap: 8px;
+        }
+        .popup-share-btn:hover { background: var(--accent); color: #000; box-shadow: 0 4px 10px rgba(212, 175, 55, 0.4); border-color: var(--accent); }
+
+        /* Kullanıcı Konum İkonu */
+        .user-marker-pulse { width: 16px; height: 16px; background: #60a5fa; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); animation: pulse-ring 1.5s infinite; }
+        @keyframes pulse-ring { 
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); } 
+            70% { transform: scale(1); box-shadow: 0 0 0 12px rgba(59, 130, 246, 0); } 
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); } 
+        }
+
+        /* MOBİL UYUM */
+        @media (max-width: 900px) {
+            body { height: auto; overflow-y: auto; display: block; }
+            header { padding: 15px 20px; }
+            .dashboard { display: flex; flex-direction: column-reverse; height: auto; }
+            #map { height: 50vh; min-height: 350px; width: 100%; flex: none; border-bottom: 2px solid var(--accent); }
+            .sidebar { width: 100%; height: auto; border-right: none; }
+            .eq-list { max-height: 60vh; overflow-y: auto; padding: 15px; }
+            .stats-bar { flex-direction: column; gap: 10px; align-items: flex-start; padding: 15px 20px;}
+            .settings-panel { width: 300px; right: -300px; }
+            .map-legend { bottom: 15px; right: 10px; padding: 10px; font-size: 11px; }
+        }
+
+        /* Alarm Arayüzü */
+        #alarmOverlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(225, 29, 72, 0.95); z-index: 9999;
+            backdrop-filter: blur(10px);
+            flex-direction: column; align-items: center; justify-content: center; text-align: center;
+        }
+        #alarmOverlay h1 { font-size: 60px; font-weight: 900; margin-bottom: 15px; text-shadow: 0 4px 30px rgba(0,0,0,0.8); animation: shake 0.4s infinite; color: white;}
+        #alarmOverlay p { font-size: 28px; font-weight: 800; margin-bottom: 40px; color: #fff; padding: 0 20px; text-shadow: 0 2px 10px rgba(0,0,0,0.5);}
+        #alarmOverlay button { background: #fff; color: var(--danger); border: none; padding: 20px 45px; font-size: 22px; font-weight: 900; border-radius: 12px; cursor: pointer; transition: transform 0.2s; box-shadow: 0 8px 25px rgba(0,0,0,0.4); }
+        #alarmOverlay button:hover { transform: scale(1.05); }
+        
+        @keyframes shake {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            25% { transform: translate(-5px, 5px) rotate(1deg); }
+            50% { transform: translate(5px, -5px) rotate(-1deg); }
+            75% { transform: translate(-5px, -5px) rotate(1deg); }
+        }
+
+        /* Sparkline Zaman Çizelgesi */
+        .sparkline-wrapper { flex-basis: 100%; margin-top: 4px; }
+        .sparkline-title { font-size: 10px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px; display: flex; justify-content: space-between; }
+        .sparkline-container { display: flex; align-items: flex-end; gap: 2px; height: 32px; }
+        .sparkline-bar { flex: 1; background: rgba(212, 175, 55, 0.3); border-radius: 2px 2px 0 0; transition: height 0.8s cubic-bezier(0.25, 0.8, 0.25, 1); min-height: 2px; cursor: pointer; position: relative; }
+        .sparkline-bar:hover { background: var(--accent); }
+        .sparkline-bar.has-big { background: rgba(239, 68, 68, 0.6); }
+        .sparkline-bar.has-big:hover { background: var(--danger); }
+
+        /* Sidebar Resize Handle */
+        .sidebar-resizer {
+            width: 5px; background: transparent; cursor: col-resize; position: relative; z-index: 999;
+            flex-shrink: 0; transition: background 0.2s;
+        }
+        .sidebar-resizer:hover, .sidebar-resizer.resizing { background: var(--accent); }
+
+        /* Bölge Bazlı Alarm Toggle */
+        .alarm-region-toggle {
+            display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+            background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 10px; cursor: pointer;
+            font-size: 13px; font-weight: 700; color: var(--text-muted); transition: 0.3s;
+        }
+        .alarm-region-toggle:hover { border-color: var(--accent); color: var(--text-main); }
+        .alarm-region-toggle input { accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer; }
+        .alarm-region-toggle.active { background: rgba(212,175,55,0.1); border-color: var(--accent); color: var(--accent); }
+
+        /* Header stats mini */
+        .header-stats {
+            display: flex; align-items: center; gap: 20px; font-size: 13px; font-weight: 700;
+        }
+        .header-stat { display: flex; flex-direction: column; align-items: center; line-height: 1.3; }
+        .header-stat-val { font-size: 18px; font-weight: 900; color: var(--accent); }
+        .header-stat-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        @media (max-width: 600px) { .header-stats { display: none; } }
+
+        /* Açık Mod */
+        body.light-mode {
+            --bg-dark: #f0f0f0;
+            --panel-bg: rgba(240, 240, 245, 0.9);
+            --text-main: #111;
+            --text-muted: #555;
+            --border: rgba(0,0,0,0.1);
+            --tool-bg: rgba(0,0,0,0.05);
+            background: #e8e8ec;
+        }
+        body.light-mode .sidebar { background: rgba(240, 240, 245, 0.95); }
+        body.light-mode .stats-bar { background: rgba(230,230,240,0.7); }
+        body.light-mode select, body.light-mode input { background: rgba(255,255,255,0.7); color: #111; border-color: rgba(0,0,0,0.15); }
+        body.light-mode .settings-panel { background: rgba(240,240,245,0.98); }
+        body.light-mode .eq-card { background: rgba(255,255,255,0.6); border-color: rgba(0,0,0,0.08); }
+        body.light-mode .eq-card:hover { background: rgba(255,255,255,0.9); }
+        body.light-mode .map-legend { background: rgba(240,240,245,0.92); }
+
+        /* MarkerCluster özel stil */
+        .marker-cluster-small, .marker-cluster-medium, .marker-cluster-large { background-clip: padding-box; border-radius: 20px; }
+        .marker-cluster-small { background-color: rgba(16,185,129,0.4); }
+        .marker-cluster-small div { background-color: rgba(16,185,129,0.7); }
+        .marker-cluster-medium { background-color: rgba(245,158,11,0.4); }
+        .marker-cluster-medium div { background-color: rgba(245,158,11,0.7); }
+        .marker-cluster-large { background-color: rgba(239,68,68,0.4); }
+        .marker-cluster-large div { background-color: rgba(239,68,68,0.7); }
+        .marker-cluster div { width: 30px; height: 30px; margin-left: 5px; margin-top: 5px; text-align: center; border-radius: 15px; font-weight: 900; font-size: 12px; color: #fff; display: flex; align-items: center; justify-content: center; }
+
+        /* Sismograf Animasyonu */
+        .seismograph { width: 120px; height: 36px; flex-shrink: 0; overflow: hidden; }
+        @media (max-width: 700px) { .seismograph { display: none; } }
+
+        /* Filtre Badge */
+        .menu-btn-wrap { position: relative; display: inline-flex; }
+        .filter-badge { 
+            position: absolute; top: -6px; right: -6px; 
+            background: var(--danger); color: #fff; border-radius: 50%; 
+            width: 18px; height: 18px; font-size: 10px; font-weight: 900; 
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 8px var(--danger); transition: all 0.3s;
+        }
+        .filter-badge.hidden { display: none; }
+
+        /* Detay Yan Paneli (bottom sheet) */
+        #detailPanel {
+            position: fixed; bottom: -100%; left: 50%; transform: translateX(-50%);
+            width: min(560px, 96vw); background: rgba(12,12,16,0.97); 
+            backdrop-filter: blur(30px); border: 1px solid var(--border); 
+            border-radius: 20px 20px 0 0; z-index: 5000; 
+            transition: bottom 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+            box-shadow: 0 -10px 60px rgba(0,0,0,0.7); overflow: hidden;
+        }
+        #detailPanel.open { bottom: 0; }
+        .detail-handle { width: 40px; height: 4px; background: rgba(255,255,255,0.15); border-radius: 2px; margin: 12px auto 0; }
+        .detail-header { padding: 16px 24px 12px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+        .detail-mag-big { font-size: 54px; font-weight: 900; line-height: 1; }
+        .detail-place-big { font-size: 15px; font-weight: 800; color: var(--text-main); margin-bottom: 5px; line-height: 1.4; }
+        .detail-sub { font-size: 12px; color: var(--text-muted); font-weight: 700; }
+        .detail-close { background: var(--tool-bg); border: 1px solid var(--border); color: var(--text-muted); width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: 0.2s; flex-shrink: 0; }
+        .detail-close:hover { color: var(--danger); border-color: var(--danger); }
+        .detail-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; padding: 0 24px 14px; }
+        .detail-card { background: var(--tool-bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px; text-align: center; }
+        .detail-card-val { font-size: 20px; font-weight: 900; margin-bottom: 4px; }
+        .detail-card-lbl { font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        .detail-actions { display: flex; gap: 8px; padding: 0 24px 24px; flex-wrap: wrap; }
+        .detail-btn { flex: 1; min-width: 100px; padding: 11px; border-radius: 10px; border: 1px solid var(--border); background: var(--tool-bg); color: var(--text-main); font-weight: 800; font-size: 12px; cursor: pointer; transition: all 0.3s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .detail-btn:hover { background: rgba(255,255,255,0.08); border-color: var(--accent); color: var(--accent); }
+        .detail-btn.primary { background: linear-gradient(135deg, var(--accent), #b8960a); color: #000; border: none; }
+        .detail-btn.primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(212,175,55,0.4); }
+
+        /* Harita Modu Butonları */
+        .map-mode-btns {
+            position: absolute; top: 15px; right: 15px; z-index: 1000;
+            display: flex; flex-direction: column; gap: 6px;
+        }
+        .map-mode-btn {
+            background: rgba(12,12,16,0.92); backdrop-filter: blur(10px);
+            border: 1px solid var(--border); color: var(--text-main);
+            padding: 8px 12px; border-radius: 8px; cursor: pointer; 
+            font-weight: 800; font-size: 12px; transition: all 0.25s;
+        }
+        .map-mode-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .map-mode-btn.active { background: rgba(212,175,55,0.15); border-color: var(--accent); color: var(--accent); }
+
+        /* Export & Ses butonları */
+        .btn-export {
+            background: rgba(16,185,129,0.1); color: var(--success); 
+            border: 1px solid rgba(16,185,129,0.35); padding: 12px; width: 100%;
+            border-radius: 10px; cursor: pointer; font-weight: 800; font-size: 13px; transition: 0.3s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn-export:hover { background: rgba(16,185,129,0.2); box-shadow: 0 4px 15px rgba(16,185,129,0.2); }
+        #voiceBtn.active { background: rgba(168,85,247,0.15) !important; color: #c084fc !important; border-color: #c084fc !important; }
+
+        /* Bildirim İzin Kartı */
+        .notif-permission-card {
+            background: linear-gradient(135deg, rgba(59,130,246,0.12), rgba(37,99,235,0.06));
+            border: 1px solid rgba(59,130,246,0.35);
+            border-radius: 12px; padding: 14px 16px;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .notif-permission-card .notif-title {
+            font-size: 13px; font-weight: 800; color: var(--text-main);
+            display: flex; align-items: center; gap: 8px;
+        }
+        .notif-permission-card .notif-desc {
+            font-size: 11px; color: var(--text-muted); font-weight: 600; line-height: 1.5;
+        }
+        .notif-status-row {
+            display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 800;
+        }
+        .notif-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+        .notif-dot.granted { background: var(--success); box-shadow: 0 0 6px var(--success); }
+        .notif-dot.denied  { background: var(--danger);  box-shadow: 0 0 6px var(--danger); }
+        .notif-dot.default { background: var(--text-muted); }
+        .btn-notif-request {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: #fff; border: none; padding: 10px 14px; border-radius: 8px;
+            font-weight: 800; font-size: 12px; cursor: pointer; transition: all 0.3s;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+            box-shadow: 0 4px 12px rgba(37,99,235,0.35);
+        }
+        .btn-notif-request:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(37,99,235,0.5); }
+        .btn-notif-request:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        #notifBtn.active { background: rgba(59,130,246,0.15) !important; color: #60a5fa !important; border-color: #60a5fa !important; }
+
+        /* Toast */
+        #toast {
+            position: fixed; bottom: 30px; left: 50%; 
+            transform: translateX(-50%) translateY(80px);
+            background: rgba(12,12,16,0.97); border: 1px solid var(--border); 
+            color: var(--text-main); padding: 12px 24px; border-radius: 12px; 
+            font-weight: 700; font-size: 14px; z-index: 9998; 
+            transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
+            backdrop-filter: blur(20px); box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+            pointer-events: none; white-space: nowrap;
+        }
+        #toast.show { transform: translateX(-50%) translateY(0); }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo">MuGöl <span>| SİSMİK RADAR</span></div>
+    
+    <!-- Canlı Sismograf -->
+    <svg class="seismograph" viewBox="0 0 120 36" xmlns="http://www.w3.org/2000/svg">
+        <polyline id="seismoLine" points="0,18 10,18 15,18 20,18 25,18 30,18 35,18 40,18 45,18 50,18 55,18 60,18 65,18 70,18 75,18 80,18 85,18 90,18 95,18 100,18 105,18 110,18 120,18"
+            stroke="rgba(212,175,55,0.5)" stroke-width="1.5" fill="none" stroke-linejoin="round"/>
+    </svg>
+
+    <div class="header-stats">
+        <div class="header-stat"><span class="header-stat-val" id="hStatCount">—</span><span class="header-stat-lbl">Deprem</span></div>
+        <div class="header-stat"><span class="header-stat-val" id="hStatMax" style="color:var(--danger)">—</span><span class="header-stat-lbl">En Büyük</span></div>
+        <div class="header-stat"><span class="header-stat-val" id="hStatSources" style="color:var(--success)">—</span><span class="header-stat-lbl">Kaynak</span></div>
+    </div>
+
+    <div style="display:flex; gap:10px; align-items:center;">
+        <button class="menu-btn" onclick="toggleLightMode()" id="lightModeBtn" title="Açık/Koyu Mod">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+        </button>
+        <div class="menu-btn-wrap">
+            <button class="menu-btn" onclick="toggleSettings()" title="Ayarlar & Filtreler">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+            </button>
+            <span class="filter-badge hidden" id="filterBadge">0</span>
+        </div>
+    </div>
+
+    <div id="progressContainer"><div id="progressBar"></div></div>
+</header>
+
+<div id="settingsOverlay" class="settings-overlay" onclick="toggleSettings()"></div>
+<div id="settingsPanel" class="settings-panel">
+    <div class="settings-header">
+        <h2>Filtre ve Araçlar</h2>
+        <button class="close-btn" onclick="toggleSettings()">✕</button>
+    </div>
+    
+    <div class="settings-content">
+        <button id="btnLocation" class="btn-location" onclick="getUserLocation()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
+            Konumumu Haritada Bul
+        </button>
+
+        <div class="control-group-vertical">
+            <label>Hızlı Arama:</label>
+            <input type="text" id="searchInput" placeholder="Şehir/Bölge Ara...">
+        </div>
+        
+        <!-- YENİ EKLENTİ: Gelişmiş Sıralama Algoritması -->
+        <div class="control-group-vertical">
+            <label>Sıralama Kriteri:</label>
+            <select id="sortBy">
+                <option value="time" selected>🕒 Zaman (En Yeni)</option>
+                <option value="mag">📏 Büyüklük (En Yüksek)</option>
+                <option value="dist">📍 Yakınlık (En Yakın) - Konum Gerektirir</option>
+            </select>
+        </div>
+
+        <div class="control-group-vertical">
+            <label>Bölge:</label>
+            <select id="region">
+                <option value="tr" selected>Türkiye (Tümü)</option>
+                <option value="marmara">🔸 Marmara</option>
+                <option value="ege">🔸 Ege</option>
+                <option value="akdeniz">🔸 Akdeniz</option>
+                <option value="icanadolu">🔸 İç Anadolu</option>
+                <option value="karadeniz">🔸 Karadeniz</option>
+                <option value="doguanadolu">🔸 Doğu Anadolu</option>
+                <option value="guneydogu">🔸 Güneydoğu</option>
+                <option value="local">📍 Yakın Çevrem (200km)</option>
+                <option value="all">🌍 Tüm Dünya</option>
+            </select>
+        </div>
+
+        <div class="control-group-vertical">
+            <label>Zaman Aralığı:</label>
+            <select id="timeSpan">
+                <option value="all_hour">Son 1 Saat</option>
+                <option value="all_day" selected>Son 24 Saat</option>
+                <option value="all_week">Son 7 Gün</option>
+            </select>
+        </div>
+
+        <div class="control-group-vertical">
+            <label>Sismik Kaynak:</label>
+            <select id="sourceSelect">
+                <option value="all" selected>Tüm Kaynaklar (Ortak)</option>
+                <option value="bdtim">BDTIM (Kandilli)</option>
+                <option value="afad">AFAD</option>
+                <option value="emsc">EMSC (Avrupa)</option>
+                <option value="geonet">GeoNet (Yeni Zelanda)</option>
+                <option value="usgs">USGS (Küresel)</option>
+            </select>
+        </div>
+
+        <div class="control-group-vertical">
+            <label>Alarm Tetikleme Şiddeti:</label>
+            <input type="number" id="minMag" value="4.5" step="0.1" min="1.0" title="Belirlenen şiddet ve üstü için siren çalar">
+            <!-- YENİ EKLENTİ: Siren Test Butonu -->
+            <button class="btn-tool" onclick="testSirenButton()" style="margin-top:5px; background: rgba(239, 68, 68, 0.15); color: var(--danger); border-color: var(--danger);">🔊 Sireni Test Et</button>
+        </div>
+
+        <div class="tools-grid">
+            <button id="btnWakeLock" class="btn-tool" onclick="toggleWakeLock()" title="Ekranın uyku moduna geçmesini engeller">👁️ Gözlem Modu</button>
+            <button id="btnFullscreen" class="btn-tool" onclick="toggleFullScreen()" title="Tam Ekran Modu">🔲 Tam Ekran</button>
+        </div>
+
+        <div class="control-group-vertical">
+            <label>Alarm Seçenekleri:</label>
+            <label class="alarm-region-toggle" id="regionAlarmLabel">
+                <input type="checkbox" id="regionAlarmCheck" checked onchange="updateRegionAlarmLabel()">
+                <span id="regionAlarmText">🔔 Sadece Seçili Bölge İçin Alarm</span>
+            </label>
+            <label class="alarm-region-toggle" id="clusterLabel" style="margin-top:6px;">
+                <input type="checkbox" id="clusterCheck" checked onchange="toggleCluster()">
+                <span>🗂️ Harita Kümeleme (Cluster)</span>
+            </label>
+        </div>
+
+        <div class="control-group-vertical">
+            <label>Ek Araçlar:</label>
+            <button id="voiceBtn" class="btn-tool" onclick="toggleVoice()">🔈 Sesli Bildirim (Kapalı)</button>
+            <button id="notifBtn" class="btn-tool" onclick="togglePushNotif()" style="margin-top:6px;">🔔 Anlık Bildirim (Kapalı)</button>
+            <button class="btn-export" onclick="exportCSV()" style="margin-top:8px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Listeyi CSV İndir
+            </button>
+        </div>
+
+        <!-- Bildirim İzin Durumu Kartı -->
+        <div class="notif-permission-card" id="notifPermCard">
+            <div class="notif-title">
+                🔔 Tarayıcı Bildirimleri
+            </div>
+            <div class="notif-desc">
+                Uygulama arka planda veya başka sekmede olsa bile deprem alarmlarını masaüstü bildirimi olarak alırsınız.
+            </div>
+            <div class="notif-status-row">
+                <div class="notif-dot default" id="notifPermDot"></div>
+                <span id="notifPermText">Durum kontrol ediliyor...</span>
+            </div>
+            <button class="btn-notif-request" id="notifPermBtn" onclick="requestNotifPermission()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                İzin Ver
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="stats-bar">
+    <div class="stat-item">Ekranda Listelenen: <span class="stat-value" id="statCount">0</span></div>
+    <div class="stat-item">Tespit Edilen En Büyük: <span class="stat-value danger" id="statMax">0.0</span></div>
+    <div class="stat-item">Ortalama Derinlik: <span class="stat-value" id="statDepth">0 km</span></div>
+    <div class="stat-item" id="userLocationText" style="display:none; color:var(--location);">📍 Konum Aktif</div>
+    
+    <!-- YENİ EKLENTİ: Şiddet Dağılım Grafiği -->
+    <div class="dist-wrapper">
+        <div class="dist-labels">
+            <span>Hafif (<3.0)</span>
+            <span>Hissedilir (3-4)</span>
+            <span>Orta (4-5)</span>
+            <span>Güçlü (5-6)</span>
+            <span>Yıkıcı (6+)</span>
+        </div>
+        <div class="mag-dist-container">
+            <div id="dist1" class="mag-dist-bar" style="background:#10b981; width:0%"></div>
+            <div id="dist2" class="mag-dist-bar" style="background:#f59e0b; width:0%"></div>
+            <div id="dist3" class="mag-dist-bar" style="background:#f97316; width:0%"></div>
+            <div id="dist4" class="mag-dist-bar" style="background:#ef4444; width:0%"></div>
+            <div id="dist5" class="mag-dist-bar" style="background:#a855f7; width:0%"></div>
+        </div>
+    </div>
+
+    <!-- YENİ: Zaman Çizelgesi Sparkline -->
+    <div class="sparkline-wrapper">
+        <div class="sparkline-title">
+            <span>📊 Son 24 Saat Dağılımı (saatlik)</span>
+            <span id="sparkHoverInfo" style="color:var(--accent);"></span>
+        </div>
+        <div class="sparkline-container" id="sparklineContainer">
+        </div>
+    </div>
+</div>
+
+<div class="dashboard">
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div>
+                <div class="sidebar-header-title">Çoklu Veri Akışı (BDTIM, EMSC...)</div>
+                <div id="lastUpdateText" style="font-size:11px; color:var(--text-muted); font-weight:700; margin-top: 4px;">Bekleniyor...</div>
+            </div>
+            <div class="status-indicator">
+                <span id="statusText">Sensörler Aktif</span>
+                <span class="status-dot" id="statusDot"></span>
+            </div>
+        </div>
+        <div class="eq-list" id="eqList">
+            <div style="text-align:center; padding:40px; color:var(--text-muted); font-weight:800; letter-spacing: 0.5px;">Sismik sensörlere bağlanılıyor, lütfen bekleyin...</div>
+        </div>
+    </div>
+    <div class="sidebar-resizer" id="sidebarResizer"></div>
+    <div id="map">
+        <!-- Harita Görünüm Modu Butonları -->
+        <div class="map-mode-btns">
+            <button class="map-mode-btn active" id="modePins" onclick="setMapMode('pins')">📍 İğneler</button>
+            <button class="map-mode-btn" id="modeHeat" onclick="setMapMode('heat')">🌡️ Isı Haritası</button>
+            <button class="map-mode-btn" id="modeCircles" onclick="setMapMode('circles')">🔵 Daireler</button>
+        </div>
+        <!-- YENİ EKLENTİ: Harita Lejantı -->
+        <div class="map-legend">
+            <div class="legend-item"><div class="legend-color" style="background:#10b981;"></div> <3.0 (Hafif)</div>
+            <div class="legend-item"><div class="legend-color" style="background:#f59e0b;"></div> 3.0 - 4.0 (Hissedilir)</div>
+            <div class="legend-item"><div class="legend-color" style="background:#f97316;"></div> 4.0 - 5.0 (Orta)</div>
+            <div class="legend-item"><div class="legend-color" style="background:#ef4444;"></div> 5.0 - 6.0 (Güçlü)</div>
+            <div class="legend-item"><div class="legend-color" style="background:#a855f7;"></div> >6.0 (Yıkıcı)</div>
+        </div>
+    </div>
+</div>
+
+<!-- Detay Bottom Sheet Paneli -->
+<div id="detailPanel">
+    <div class="detail-handle"></div>
+    <div class="detail-header">
+        <div>
+            <div class="detail-mag-big" id="detailMag">—</div>
+        </div>
+        <div style="flex:1; padding-left:16px;">
+            <div class="detail-place-big" id="detailPlace">—</div>
+            <div class="detail-sub" id="detailTime">—</div>
+            <div class="detail-sub" id="detailSource" style="margin-top:4px; color:var(--accent);">—</div>
+        </div>
+        <button class="detail-close" onclick="closeDetail()">✕</button>
+    </div>
+    <div class="detail-grid">
+        <div class="detail-card">
+            <div class="detail-card-val" id="detailDepth" style="color:#60a5fa;">—</div>
+            <div class="detail-card-lbl">Derinlik</div>
+        </div>
+        <div class="detail-card">
+            <div class="detail-card-val" id="detailIntensity" style="color:#c084fc;">—</div>
+            <div class="detail-card-lbl">Tahmini Şiddet</div>
+        </div>
+        <div class="detail-card">
+            <div class="detail-card-val" id="detailDist" style="color:var(--warning);">—</div>
+            <div class="detail-card-lbl">Uzaklık</div>
+        </div>
+    </div>
+    <div class="detail-actions">
+        <button class="detail-btn primary" id="detailGoBtn" onclick="goToDetailEq()">🗺️ Haritada Göster</button>
+        <button class="detail-btn" onclick="shareDetailEq()">📤 Paylaş</button>
+        <button class="detail-btn" onclick="closeDetail()">✕ Kapat</button>
+    </div>
+</div>
+
+<!-- Toast Bildirimi -->
+<div id="toast"></div>
+
+<div id="alarmOverlay">
+    <h1>⚠️ ŞİDDETLİ DEPREM ALARMI ⚠️</h1>
+    <p id="alarmDetails"></p>
+    <button onclick="stopAlarm()">SİRENİ SUSTUR VE BÖLGEYE GİT</button>
+</div>
+
+<script>
+    // --- MENÜ (OFFCANVAS) SİSTEMİ ---
+    function toggleSettings() {
+        document.getElementById('settingsPanel').classList.toggle('active');
+        document.getElementById('settingsOverlay').classList.toggle('active');
+    }
+
+    // --- AÇIK/KOYU MOD ---
+    function toggleLightMode() {
+        document.body.classList.toggle('light-mode');
+        const btn = document.getElementById('lightModeBtn');
+        if (document.body.classList.contains('light-mode')) {
+            btn.style.color = 'var(--accent)';
+            btn.style.borderColor = 'var(--accent)';
+        } else {
+            btn.style.color = '';
+            btn.style.borderColor = '';
+        }
+    }
+
+    // --- BÖLGE BAZLI ALARM LABEL ---
+    function updateRegionAlarmLabel() {
+        const chk = document.getElementById('regionAlarmCheck');
+        const lbl = document.getElementById('regionAlarmLabel');
+        const regionName = document.getElementById('region').options[document.getElementById('region').selectedIndex].text;
+        if (chk.checked) {
+            document.getElementById('regionAlarmText').textContent = `🔔 Sadece: ${regionName}`;
+            lbl.classList.add('active');
+        } else {
+            document.getElementById('regionAlarmText').textContent = '🔕 Tüm Bölgeler İçin Alarm';
+            lbl.classList.remove('active');
+        }
+    }
+
+    // --- CLUSTER TOGGLE ---
+    let clusterEnabled = true;
+    function toggleCluster() {
+        clusterEnabled = document.getElementById('clusterCheck').checked;
+        const lbl = document.getElementById('clusterLabel');
+        lbl.classList.toggle('active', clusterEnabled);
+        fetchEarthquakes(true);
+    }
+
+    // --- SİDEBAR RESIZE ---
+    (function() {
+        const sidebar = document.getElementById('sidebar');
+        const resizer = document.getElementById('sidebarResizer');
+        let isResizing = false;
+        let startX, startW;
+
+        resizer.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            startX = e.clientX;
+            startW = sidebar.offsetWidth;
+            resizer.classList.add('resizing');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            const newW = Math.max(280, Math.min(650, startW + e.clientX - startX));
+            sidebar.style.width = newW + 'px';
+        });
+        document.addEventListener('mouseup', () => {
+            if (!isResizing) return;
+            isResizing = false;
+            resizer.classList.remove('resizing');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        });
+    })();
+
+    // --- SES SİSTEMİ (GÖRÜNMEZ OTOMATİK BAŞLATMA) ---
+    let audioCtx;
+    let alarmInterval;
+    let isAudioEnabled = false;
+
+    function initAudioOnFirstInteraction() {
+        if (!isAudioEnabled) {
+            try {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                isAudioEnabled = true;['click', 'touchstart', 'keydown', 'scroll'].forEach(evt => {
+                    document.removeEventListener(evt, initAudioOnFirstInteraction);
+                });
+            } catch (e) {
+                console.log("Ses sistemi arka planda bekliyor.");
+            }
+        }
+    }
+
+    window.addEventListener('load', initAudioOnFirstInteraction);['click', 'touchstart', 'keydown', 'scroll'].forEach(evt => {
+        document.addEventListener(evt, initAudioOnFirstInteraction, { once: true });
+    });
+
+    function playSiren() {
+        if(!isAudioEnabled || !audioCtx) return;
+        try {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sawtooth';
+            
+            osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+            osc.frequency.linearRampToValueAtTime(1200, audioCtx.currentTime + 0.4);
+            osc.frequency.linearRampToValueAtTime(600, audioCtx.currentTime + 0.8);
+            
+            gain.gain.setValueAtTime(0, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(1, audioCtx.currentTime + 0.1);
+            gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.8);
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.8);
+        } catch(e) { console.error("Siren Hatası", e); }
+    }
+    
+    // YENİ EKLENTİ: Siren Test Fonksiyonu
+    window.testSirenButton = function() {
+        initAudioOnFirstInteraction();
+        playSiren();
+        alert("Siren Test Edildi! Cihazınızın sesi açıksa sireni duymuş olmalısınız.");
+    }
+
+    let alarmLocation = null;
+    function triggerAlarm(eq) {
+        document.getElementById('alarmOverlay').style.display = 'flex';
+        
+        let distText = "";
+        if(userLocation) {
+            const dist = getDistance(userLocation.lat, userLocation.lng, eq.lat, eq.lng);
+            distText = `<br><span style="color:#facc15;">📍 Sana Uzaklık: ${dist.toFixed(0)} km</span>`;
+        }
+
+        document.getElementById('alarmDetails').innerHTML = `Büyüklük: <b>${eq.mag.toFixed(1)}</b><br>Kaynak: <b>${eq.source}</b><br><br>🗺️ ${eq.place} ${distText}`;
+        alarmLocation =[eq.lat, eq.lng];
+        playSiren();
+        alarmInterval = setInterval(playSiren, 900);
+    }
+
+    function stopAlarm() {
+        document.getElementById('alarmOverlay').style.display = 'none';
+        clearInterval(alarmInterval);
+        if(alarmLocation) {
+            map.flyTo(alarmLocation, 8, { animate: true, duration: 1.5 });
+            document.getElementById('settingsPanel').classList.remove('active');
+            document.getElementById('settingsOverlay').classList.remove('active');
+        }
+    }
+
+    // --- GÖZLEM MODU (WAKE LOCK API) ---
+    let wakeLock = null;
+    async function toggleWakeLock() {
+        const btn = document.getElementById('btnWakeLock');
+        if (wakeLock !== null) {
+            await wakeLock.release();
+            wakeLock = null;
+            btn.classList.remove('active');
+            btn.innerHTML = '👁️ Gözlem Modu';
+        } else {
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+                btn.classList.add('active');
+                btn.innerHTML = '👁️ Ekran Uyanık';
+                
+                wakeLock.addEventListener('release', () => {
+                    if(wakeLock === null) return;
+                    wakeLock = null;
+                    btn.classList.remove('active');
+                    btn.innerHTML = '👁️ Gözlem Modu';
+                });
+            } catch (err) {
+                alert('Tarayıcınız Gözlem Modunu desteklemiyor.');
+            }
+        }
+    }
+
+    document.addEventListener('visibilitychange', async () => {
+        if (wakeLock !== null && document.visibilityState === 'visible') {
+            wakeLock = await navigator.wakeLock.request('screen');
+        }
+    });
+
+    // --- TAM EKRAN MODU ---
+    function toggleFullScreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                alert(`Tam ekran hatası: ${err.message}`);
+            });
+        } else {
+            document.exitFullscreen();
+        }
+    }
+
+    // --- BÖLGELER İÇİN KOORDİNAT VE SINIR TANIMLAMALARI ---
+    const regionBounds = {
+        tr: { minLat: 34.0, maxLat: 43.0, minLng: 25.0, maxLng: 45.0, center:[39.0, 35.0], zoom: 6 },
+        marmara: { minLat: 39.0, maxLat: 42.5, minLng: 25.5, maxLng: 31.5, center:[40.5, 28.5], zoom: 7 },
+        ege: { minLat: 36.0, maxLat: 39.5, minLng: 25.0, maxLng: 30.0, center:[38.0, 27.5], zoom: 7 },
+        akdeniz: { minLat: 35.5, maxLat: 38.5, minLng: 29.0, maxLng: 37.0, center:[37.0, 32.5], zoom: 7 },
+        icanadolu: { minLat: 37.0, maxLat: 40.5, minLng: 30.5, maxLng: 37.5, center:[39.0, 34.0], zoom: 7 },
+        karadeniz: { minLat: 40.0, maxLat: 42.5, minLng: 31.0, maxLng: 42.0, center:[41.0, 36.5], zoom: 6 },
+        doguanadolu: { minLat: 37.0, maxLat: 41.5, minLng: 37.5, maxLng: 44.5, center:[39.0, 41.0], zoom: 6 },
+        guneydogu: { minLat: 36.5, maxLat: 38.5, minLng: 37.0, maxLng: 43.0, center:[37.5, 40.0], zoom: 7 }
+    };
+
+    // --- HARİTA SİSTEMİ (LEAFLET) ---
+    const map = L.map('map', { zoomControl: false }).setView(regionBounds.tr.center, regionBounds.tr.zoom);
+    L.control.zoom({ position: 'topleft' }).addTo(map);
+
+    const darkMap = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: 'MuGöl Radar' }).addTo(map);
+    const satelliteMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
+    
+    const faultLinesLayer = L.layerGroup();
+    fetch('https://raw.githubusercontent.com/fraxen/tectonicplates/master/GeoJSON/PB2002_boundaries.json')
+        .then(res => res.json())
+        .then(data => {
+            L.geoJSON(data, {
+                style: { color: '#ef4444', weight: 1.5, opacity: 0.6, dashArray: '4, 6' }
+            }).addTo(faultLinesLayer);
+        }).catch(err => console.log('Fay hatları verisi çekilemedi.'));
+
+    L.control.layers(
+        { "Karanlık Radar": darkMap, "Uydu Görünümü": satelliteMap }, 
+        { "🔴 Fay Hatları (Küresel)": faultLinesLayer },
+        { position: 'bottomleft'}
+    ).addTo(map);
+
+    let mapMarkers =[];
+    let markerClusterGroup = null;
+
+    // --- KONUM SİSTEMİ ---
+    let userLocation = null;
+    let userMarkerLayer = null;
+
+    function getUserLocation() {
+        const btn = document.getElementById('btnLocation');
+        btn.innerHTML = '⏳ Tarayıcıdan Onay Verin...';
+        btn.style.background = '#f59e0b'; 
+        
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    userLocation = { lat: position.coords.latitude, lng: position.coords.longitude };
+                    
+                    if (userMarkerLayer) map.removeLayer(userMarkerLayer);
+                    
+                    const userIcon = L.divIcon({ className: 'user-marker-pulse', iconSize:[16, 16] });
+                    userMarkerLayer = L.marker([userLocation.lat, userLocation.lng], {icon: userIcon, zIndexOffset: 1000})
+                        .addTo(map)
+                        .bindPopup('<b style="color:var(--location)">Sen Buradasın!</b><br>Artık depremlerin sana uzaklığını görebilirsin.');
+                    
+                    map.flyTo([userLocation.lat, userLocation.lng], 8, { animate: true, duration: 1.5 });
+                    
+                    btn.innerHTML = '✓ Konum Aktif';
+                    btn.style.background = 'var(--success)';
+                    document.getElementById('userLocationText').style.display = 'flex';
+                    
+                    fetchEarthquakes(true);
+                    
+                    if(window.innerWidth < 900) toggleSettings();
+                },
+                (error) => {
+                    alert("Konum izni reddedildi. Lütfen tarayıcı adres çubuğundaki kilit (veya i) simgesine tıklayıp konum izni verin.");
+                    btn.innerHTML = '❌ İzin Reddedildi';
+                    btn.style.background = 'var(--danger)';
+                    setTimeout(() => {
+                        btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg> Konumumu Haritada Bul';
+                        btn.style.background = 'linear-gradient(135deg, #2563eb, #1d4ed8)';
+                    }, 3000);
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        } else {
+            alert("Tarayıcınız konum özelliğini desteklemiyor.");
+            btn.innerHTML = '📍 Konum Bulunamadı';
+        }
+    }
+
+    // YENİ EKLENTİ: Hızlı Paylaşım (Web Share API)
+    window.shareEq = function(place, mag, timeStr) {
+        if(navigator.share) {
+            navigator.share({
+                title: '🚨 Deprem Bilgisi',
+                text: `MuGöl Sismik Radar Tespit Etti:\n📍 Bölge: ${place}\n📏 Büyüklük: ${mag}\n🕒 Tarih: ${timeStr}`
+            }).catch(e => console.log("Paylaşım iptal edildi."));
+        } else {
+            alert("Tarayıcınız hızlı paylaşım özelliğini desteklemiyor.\n\nBilgiler:\n" + place + " - Büyüklük: " + mag);
+        }
+    }
+
+    // --- YARDIMCI FONKSİYONLAR ---
+    function titleCase(str) {
+        if(!str) return "Bilinmeyen Konum";
+        return str.toLocaleLowerCase('tr-TR').split(' ').map(w => w.charAt(0).toLocaleUpperCase('tr-TR') + w.slice(1)).join(' ');
+    }
+
+    function translatePlace(place) {
+        if (!place) return "Bilinmeyen Konum";
+        return place.replace(/Turkey/gi, "Türkiye").replace(/Greece/gi, "Yunanistan").replace(/Syria/gi, "Suriye")
+            .replace(/Iran/gi, "İran").replace(/Iraq/gi, "Irak").replace(/Cyprus/gi, "Kıbrıs").replace(/of/gi, "")
+            .replace(/Central/gi, "Orta").replace(/Western/gi, "Batı").replace(/Eastern/gi, "Doğu")
+            .replace(/Northern/gi, "Kuzey").replace(/Southern/gi, "Güney")
+            .replace(/km/gi, "km").replace(/ N /gi, " Kuzeyi ").replace(/ S /gi, " Güneyi ")
+            .replace(/ E /gi, " Doğusu ").replace(/ W /gi, " Batısı ").trim();
+    }
+
+    function parseApiDate(dateStr) {
+        if (!dateStr) return Date.now();
+        if (dateStr.includes('T')) {
+            const d = new Date(dateStr);
+            return isNaN(d.getTime()) ? Date.now() : d.getTime();
+        }
+        let cleanDate = dateStr.replace(/\./g, '-');
+        const parts = cleanDate.split(' ');
+        if (parts.length === 2) {
+            const iso = `${parts[0]}T${parts[1]}+03:00`; 
+            const d = new Date(iso);
+            if (!isNaN(d.getTime())) return d.getTime();
+        }
+        let safariSafe = cleanDate.replace(/-/g, '/');
+        const fallback = new Date(safariSafe).getTime();
+        return isNaN(fallback) ? Date.now() : fallback;
+    }
+
+    function getDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371; 
+        const dLat = (lat2 - lat1) * Math.PI / 180; 
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+        return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+    }
+
+    function getColor(mag) {
+        if(mag < 3.0) return '#10b981'; 
+        if(mag < 4.0) return '#f59e0b'; 
+        if(mag < 5.0) return '#f97316'; 
+        if(mag < 6.0) return '#ef4444'; 
+        return '#a855f7'; 
+    }
+
+    function getIntensity(mag) {
+        if(mag < 3.0) return 'Seviye 1-2 (Hafif)';
+        if(mag < 4.0) return 'Seviye 3 (Hissedilir)';
+        if(mag < 5.0) return 'Seviye 4-5 (Orta Şiddetli)';
+        if(mag < 6.0) return 'Seviye 6-7 (Güçlü)';
+        return 'Seviye 8-10 (Yıkıcı)';
+    }
+
+    function formatDate(time) {
+        const d = new Date(time);
+        return d.toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'}) + ' | ' + d.toLocaleDateString('tr-TR');
+    }
+
+    // --- TOAST BİLDİRİM ---
+    let toastTimer;
+    function showToast(msg, duration = 3000) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => t.classList.remove('show'), duration);
+    }
+
+    // --- DETAY PANELİ ---
+    let currentDetailEq = null;
+    function openDetail(eq) {
+        currentDetailEq = eq;
+        const color = getColor(eq.mag);
+        document.getElementById('detailMag').textContent = (eq.mag || 0).toFixed(1);
+        document.getElementById('detailMag').style.color = color;
+        document.getElementById('detailPlace').textContent = eq.place;
+        document.getElementById('detailTime').textContent = '🕒 ' + formatDate(eq.time);
+        document.getElementById('detailSource').textContent = '📡 ' + eq.source;
+        document.getElementById('detailDepth').textContent = eq.depth.toFixed(1) + ' km';
+        document.getElementById('detailIntensity').textContent = getIntensity(eq.mag).split('(')[1]?.replace(')','') || '—';
+        document.getElementById('detailDist').textContent = userLocation
+            ? getDistance(userLocation.lat, userLocation.lng, eq.lat, eq.lng).toFixed(0) + ' km'
+            : '—';
+        document.getElementById('detailPanel').classList.add('open');
+    }
+    function closeDetail() {
+        document.getElementById('detailPanel').classList.remove('open');
+        currentDetailEq = null;
+    }
+    function goToDetailEq() {
+        if (!currentDetailEq) return;
+        flyToLocation(currentDetailEq.lat, currentDetailEq.lng);
+        closeDetail();
+    }
+    function shareDetailEq() {
+        if (!currentDetailEq) return;
+        shareEq(currentDetailEq.place, (currentDetailEq.mag || 0).toFixed(1), formatDate(currentDetailEq.time));
+    }
+    // Paneli dışarı tıklayınca kapat
+    document.addEventListener('click', (e) => {
+        const panel = document.getElementById('detailPanel');
+        if (panel.classList.contains('open') && !panel.contains(e.target)) closeDetail();
+    });
+
+    // --- SİSMOGRAF ANİMASYONU ---
+    (function() {
+        const line = document.getElementById('seismoLine');
+        if (!line) return;
+        const pts = Array(22).fill(18);
+        let frame = 0;
+        function tick() {
+            frame++;
+            // Rasgele sismik hareket simülasyonu
+            pts.push(pts[pts.length - 1] + (Math.random() - 0.49) * (Math.random() > 0.93 ? 18 : 3));
+            pts.shift();
+            const clamped = pts.map(p => Math.max(2, Math.min(34, p)));
+            const pointStr = clamped.map((y, i) => `${i * (120/21)},${y}`).join(' ');
+            line.setAttribute('points', pointStr);
+            // Büyük deprem efekti: renk kırmızıya döner
+            const maxDeviation = Math.max(...clamped.map(p => Math.abs(p - 18)));
+            line.setAttribute('stroke', maxDeviation > 10 ? 'rgba(239,68,68,0.8)' : 'rgba(212,175,55,0.6)');
+            requestAnimationFrame(tick);
+        }
+        tick();
+    })();
+
+    // --- FİLTRE BADGE SAYACI ---
+    function updateFilterBadge() {
+        let count = 0;
+        if (document.getElementById('region')?.value !== 'tr') count++;
+        if (document.getElementById('timeSpan')?.value !== 'all_day') count++;
+        if (document.getElementById('sourceSelect')?.value !== 'all') count++;
+        if (document.getElementById('sortBy')?.value !== 'time') count++;
+        if (document.getElementById('searchInput')?.value.trim()) count++;
+        const badge = document.getElementById('filterBadge');
+        if (count > 0) { badge.textContent = count; badge.classList.remove('hidden'); }
+        else { badge.classList.add('hidden'); }
+    }
+
+    // --- HARİTA GÖRÜNÜM MODU ---
+    let currentMapMode = 'pins'; // 'pins' | 'heat' | 'circles'
+    let heatLayer = null;
+    let lastRenderedFeatures = [];
+
+    function setMapMode(mode) {
+        currentMapMode = mode;
+        ['modePins','modeHeat','modeCircles'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+        document.getElementById('mode' + mode.charAt(0).toUpperCase() + mode.slice(1))?.classList.add('active');
+        if (lastRenderedFeatures.length > 0) renderData(lastRenderedFeatures, true);
+        showToast(mode === 'heat' ? '🌡️ Isı Haritası Modu' : mode === 'circles' ? '🔵 Daire Modu' : '📍 İğne Modu');
+    }
+
+    // --- SESLİ BİLDİRİM (Web Speech API) ---
+    let voiceEnabled = false;
+    function toggleVoice() {
+        voiceEnabled = !voiceEnabled;
+        const btn = document.getElementById('voiceBtn');
+        btn.textContent = voiceEnabled ? '🔊 Sesli Bildirim (Açık)' : '🔈 Sesli Bildirim (Kapalı)';
+        btn.classList.toggle('active', voiceEnabled);
+        if (voiceEnabled) showToast('🔊 Sesli bildirim açıldı');
+        else showToast('🔇 Sesli bildirim kapatıldı');
+    }
+    function speakEarthquake(eq) {
+        if (!voiceEnabled || !window.speechSynthesis) return;
+        const msg = new SpeechSynthesisUtterance();
+        msg.lang = 'tr-TR';
+        msg.text = `Dikkat! ${eq.place} bölgesinde büyüklüğü ${(eq.mag||0).toFixed(1)} olan bir deprem tespit edildi.`;
+        msg.rate = 1.0; msg.pitch = 1.1; msg.volume = 1.0;
+        window.speechSynthesis.speak(msg);
+    }
+
+    // ====================================================
+    // --- PUSH BİLDİRİM SİSTEMİ (Web Notifications API) ---
+    // ====================================================
+    let pushNotifEnabled = false;
+
+    // Sayfa yüklenince izin durumunu kontrol et
+    function initNotifPermUI() {
+        if (!('Notification' in window)) {
+            document.getElementById('notifPermCard').style.display = 'none';
+            document.getElementById('notifBtn').style.display = 'none';
+            return;
+        }
+        updateNotifPermUI();
+    }
+
+    function updateNotifPermUI() {
+        const perm = Notification.permission;
+        const dot  = document.getElementById('notifPermDot');
+        const text = document.getElementById('notifPermText');
+        const btn  = document.getElementById('notifPermBtn');
+        const notifToggle = document.getElementById('notifBtn');
+
+        dot.className = 'notif-dot ' + perm;
+
+        if (perm === 'granted') {
+            text.textContent = '✅ İzin Verildi — Bildirimler Aktif';
+            text.style.color = 'var(--success)';
+            btn.disabled = true;
+            btn.textContent = '✓ İzin Alındı';
+            btn.style.background = 'rgba(16,185,129,0.2)';
+            btn.style.color = 'var(--success)';
+            btn.style.border = '1px solid rgba(16,185,129,0.4)';
+            btn.style.boxShadow = 'none';
+            // Otomatik aç
+            if (!pushNotifEnabled) {
+                pushNotifEnabled = true;
+                notifToggle.textContent = '🔔 Anlık Bildirim (Açık)';
+                notifToggle.classList.add('active');
+            }
+        } else if (perm === 'denied') {
+            text.textContent = '❌ İzin Reddedildi — Tarayıcı ayarlarından açın';
+            text.style.color = 'var(--danger)';
+            btn.disabled = true;
+            btn.textContent = '🚫 Reddedildi';
+            btn.style.background = 'rgba(239,68,68,0.1)';
+            btn.style.color = 'var(--danger)';
+            btn.style.border = '1px solid rgba(239,68,68,0.3)';
+            btn.style.boxShadow = 'none';
+        } else {
+            text.textContent = 'İzin verilmemiş — aşağıdan izin isteyin';
+            text.style.color = 'var(--text-muted)';
+            btn.disabled = false;
+            btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg> İzin Ver`;
+            btn.style.background = 'linear-gradient(135deg, #2563eb, #1d4ed8)';
+            btn.style.color = '#fff';
+            btn.style.border = 'none';
+            btn.style.boxShadow = '0 4px 12px rgba(37,99,235,0.35)';
+        }
+    }
+
+    async function requestNotifPermission() {
+        if (!('Notification' in window)) {
+            showToast('❌ Tarayıcınız bildirimleri desteklemiyor');
+            return;
+        }
+        const btn = document.getElementById('notifPermBtn');
+        btn.disabled = true;
+        btn.textContent = '⏳ Bekleniyor...';
+        try {
+            const result = await Notification.requestPermission();
+            updateNotifPermUI();
+            if (result === 'granted') {
+                showToast('✅ Bildirim izni alındı!');
+                // Test bildirimi gönder
+                setTimeout(() => {
+                    sendPushNotif(
+                        '🚨 MuGöl Sismik Radar',
+                        'Deprem bildirimleri aktif! Yeni deprem tespit edildiğinde buradan bilgilendirileceksiniz.',
+                        null
+                    );
+                }, 800);
+            } else if (result === 'denied') {
+                showToast('❌ Bildirim izni reddedildi');
+            }
+        } catch(e) {
+            btn.disabled = false;
+            updateNotifPermUI();
+        }
+    }
+
+    function togglePushNotif() {
+        if (!('Notification' in window)) {
+            showToast('❌ Tarayıcınız bildirimleri desteklemiyor');
+            return;
+        }
+        if (Notification.permission === 'denied') {
+            showToast('❌ Tarayıcı ayarlarından izin verin');
+            return;
+        }
+        if (Notification.permission === 'default') {
+            requestNotifPermission();
+            return;
+        }
+        pushNotifEnabled = !pushNotifEnabled;
+        const btn = document.getElementById('notifBtn');
+        btn.textContent = pushNotifEnabled ? '🔔 Anlık Bildirim (Açık)' : '🔕 Anlık Bildirim (Kapalı)';
+        btn.classList.toggle('active', pushNotifEnabled);
+        showToast(pushNotifEnabled ? '🔔 Push bildirimler açıldı' : '🔕 Push bildirimler kapatıldı');
+    }
+
+    function sendPushNotif(title, body, eq) {
+        if (!pushNotifEnabled) return;
+        if (!('Notification' in window) || Notification.permission !== 'granted') return;
+        try {
+            const options = {
+                body: body,
+                icon: 'https://cdn-icons-png.flaticon.com/512/3588/3588293.png',
+                badge: 'https://cdn-icons-png.flaticon.com/512/3588/3588293.png',
+                tag: eq ? `eq-${eq.id}` : 'mugol-info',   // aynı id'li bildirimi çakıştırma
+                renotify: false,
+                silent: false,
+                vibrate: eq && eq.mag >= 5 ? [200, 100, 200, 100, 400] : [200, 100, 200],
+                requireInteraction: eq && eq.mag >= 5.5,   // büyük depremlerde bildirim kalır
+                data: eq ? { lat: eq.lat, lng: eq.lng, mag: eq.mag } : null
+            };
+            const notif = new Notification(title, options);
+            // Bildirime tıklayınca sekmeye odaklan ve haritaya git
+            notif.onclick = function() {
+                window.focus();
+                if (this.data && this.data.lat) {
+                    flyToLocation(this.data.lat, this.data.lng);
+                }
+                this.close();
+            };
+        } catch(e) {
+            console.warn('Push bildirim gönderilemedi:', e);
+        }
+    }
+
+    // Deprem alarmıyla entegre: her yeni depremde bildirim gönder
+    function sendEqNotification(eq) {
+        if (!pushNotifEnabled) return;
+        const mag = (eq.mag || 0).toFixed(1);
+        const color = eq.mag >= 6 ? '🟣' : eq.mag >= 5 ? '🔴' : eq.mag >= 4 ? '🟠' : eq.mag >= 3 ? '🟡' : '🟢';
+        let distStr = '';
+        if (userLocation) {
+            const dist = getDistance(userLocation.lat, userLocation.lng, eq.lat, eq.lng);
+            distStr = ` • Sana ${dist.toFixed(0)} km`;
+        }
+        const title = `${color} M${mag} Deprem — ${eq.place}`;
+        const body  = `⏱ ${formatDate(eq.time)}  ⬇️ ${eq.depth.toFixed(1)} km derinlik  📡 ${eq.source}${distStr}`;
+        sendPushNotif(title, body, eq);
+    }
+
+    // --- CSV EXPORT ---
+    function exportCSV() {
+        if (!lastRenderedFeatures.length) { showToast('⚠️ Önce veri yükleyin'); return; }
+        const header = 'Büyüklük,Yer,Tarih,Derinlik (km),Kaynak,Enlem,Boylam\n';
+        const rows = lastRenderedFeatures.map(eq => 
+            `${(eq.mag||0).toFixed(1)},"${eq.place}","${formatDate(eq.time)}",${eq.depth.toFixed(1)},${eq.source},${eq.lat},${eq.lng}`
+        ).join('\n');
+        const blob = new Blob(['\uFEFF' + header + rows], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `mugol_depremler_${new Date().toISOString().slice(0,10)}.csv`;
+        a.click(); URL.revokeObjectURL(url);
+        showToast('✅ CSV indirildi (' + lastRenderedFeatures.length + ' kayıt)');
+        toggleSettings();
+    }
+
+    window.flyToLocation = function(lat, lng) {
+        map.flyTo([lat, lng], 10, { animate: true, duration: 1.5 });
+        if(window.innerWidth < 900 && document.getElementById('settingsPanel').classList.contains('active')) {
+            toggleSettings();
+        }
+    }
+
+    // --- DEPREM ALGORİTMASI VE FİLTRELER ---
+    let seenIds = new Set();
+    const MAX_SEEN_IDS = 2000; // Bellek sızıntısı önlemi
+    const regionSelect = document.getElementById('region');
+    const timeSpanSelect = document.getElementById('timeSpan');
+    const sourceSelect = document.getElementById('sourceSelect');
+    const sortSelect = document.getElementById('sortBy'); // YENİ EKLENTİ
+    const minMagInput = document.getElementById('minMag');
+    const searchInput = document.getElementById('searchInput'); 
+    const eqListEl = document.getElementById('eqList');
+
+    let searchTimeout;
+    searchInput.addEventListener('input', () => {
+        clearTimeout(searchTimeout);
+        updateFilterBadge();
+        searchTimeout = setTimeout(() => {
+            eqListEl.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted); font-weight:800;">Aranıyor...</div>';
+            fetchEarthquakes(true);
+        }, 500);
+    });[regionSelect, timeSpanSelect, sourceSelect, sortSelect].forEach(el => {
+        el.addEventListener('change', () => {
+            if(el.id === 'region') {
+                const val = regionSelect.value;
+                if(regionBounds[val]) {
+                    map.flyTo(regionBounds[val].center, regionBounds[val].zoom);
+                }
+                else if(val === 'local') {
+                    if(!userLocation) { alert("Önce 'Konum' butonuna tıklamalısınız!"); regionSelect.value = 'tr'; return; }
+                    map.flyTo([userLocation.lat, userLocation.lng], 7);
+                }
+                else { map.flyTo([20.0, 0.0], 2); } 
+                updateRegionAlarmLabel();
+            }
+            if(el.id === 'sortBy' && sortSelect.value === 'dist' && !userLocation) {
+                 alert("Yakınlığa göre sıralamak için 'Konumumu Bul' butonuna tıklamalısınız."); 
+                 sortSelect.value = 'time';
+                 return;
+            }
+            eqListEl.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted); font-weight:800;">Filtreler uygulanıyor...</div>';
+            updateFilterBadge();
+            fetchEarthquakes(true);
+        });
+    });
+
+    function updateStats(features) {
+        document.getElementById('statCount').innerText = features.length;
+        document.getElementById('hStatCount').innerText = features.length;
+        if(features.length > 0) {
+            const maxMag = Math.max(...features.map(f => f.mag || 0)).toFixed(1);
+            document.getElementById('statMax').innerText = maxMag;
+            document.getElementById('hStatMax').innerText = maxMag;
+            const totalDepth = features.reduce((sum, f) => sum + (f.depth || 0), 0);
+            document.getElementById('statDepth').innerText = (totalDepth / features.length).toFixed(1) + " km";
+            // kaynak sayısı
+            const sources = new Set(features.map(f => f.source.split(' & ')[0]));
+            document.getElementById('hStatSources').innerText = sources.size;
+        } else {
+            document.getElementById('statMax').innerText = "0.0";
+            document.getElementById('hStatMax').innerText = "—";
+            document.getElementById('statDepth').innerText = "0 km";
+            document.getElementById('hStatCount').innerText = "0";
+            document.getElementById('hStatSources').innerText = "—";
+        }
+        document.getElementById('lastUpdateText').innerText = "Son Güncelleme: " + new Date().toLocaleTimeString('tr-TR');
+
+        // YENİ EKLENTİ: Şiddet Dağılım Hesabı
+        let c1=0, c2=0, c3=0, c4=0, c5=0;
+        features.forEach(f => {
+            if(f.mag < 3) c1++;
+            else if(f.mag < 4) c2++;
+            else if(f.mag < 5) c3++;
+            else if(f.mag < 6) c4++;
+            else c5++;
+        });
+        const total = features.length || 1;
+        document.getElementById('dist1').style.width = (c1/total)*100 + '%';
+        document.getElementById('dist2').style.width = (c2/total)*100 + '%';
+        document.getElementById('dist3').style.width = (c3/total)*100 + '%';
+        document.getElementById('dist4').style.width = (c4/total)*100 + '%';
+        document.getElementById('dist5').style.width = (c5/total)*100 + '%';
+
+        // YENİ: Sparkline Zaman Çizelgesi (son 24 saat, saatlik)
+        updateSparkline(features);
+    }
+
+    function updateSparkline(features) {
+        const container = document.getElementById('sparklineContainer');
+        const now = Date.now();
+        const hourMs = 3600000;
+        const hours = 24;
+        const buckets = Array(hours).fill(null).map(() => ({ count: 0, maxMag: 0 }));
+        features.forEach(f => {
+            const ago = now - f.time;
+            if (ago < 0 || ago > hours * hourMs) return;
+            const idx = hours - 1 - Math.floor(ago / hourMs);
+            if (idx >= 0 && idx < hours) {
+                buckets[idx].count++;
+                if (f.mag > buckets[idx].maxMag) buckets[idx].maxMag = f.mag;
+            }
+        });
+        const maxCount = Math.max(...buckets.map(b => b.count), 1);
+        container.innerHTML = '';
+        buckets.forEach((b, i) => {
+            const pct = Math.max((b.count / maxCount) * 100, b.count > 0 ? 8 : 2);
+            const bar = document.createElement('div');
+            bar.className = 'sparkline-bar' + (b.maxMag >= 5.0 ? ' has-big' : '');
+            bar.style.height = pct + '%';
+            const hourLabel = new Date(now - (hours - 1 - i) * hourMs).getHours() + ':00';
+            bar.title = `${hourLabel} - ${b.count} deprem${b.count > 0 ? ' / Max: M' + b.maxMag.toFixed(1) : ''}`;
+            bar.onmouseenter = () => {
+                document.getElementById('sparkHoverInfo').textContent = b.count > 0 ? `${hourLabel}: ${b.count} deprem (Max M${b.maxMag.toFixed(1)})` : `${hourLabel}: Deprem yok`;
+            };
+            bar.onmouseleave = () => { document.getElementById('sparkHoverInfo').textContent = ''; };
+            container.appendChild(bar);
+        });
+    }
+
+    function renderData(features, isInit) {
+        const previousScroll = eqListEl.scrollTop;
+        eqListEl.innerHTML = '';
+        lastRenderedFeatures = features; // CSV export ve yeniden render için kaydet
+        
+        // Haritadan eski marker'ları temizle
+        mapMarkers.forEach(marker => map.removeLayer(marker));
+        mapMarkers = [];
+        if (markerClusterGroup) { map.removeLayer(markerClusterGroup); markerClusterGroup = null; }
+        if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; }
+
+        updateStats(features);
+        updateFilterBadge();
+
+        if(features.length === 0) {
+            eqListEl.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-muted);">Belirtilen kriterlerde kayıt bulunamadı.</div>';
+            return;
+        }
+
+        let closestEqId = null;
+        if (userLocation && features.length > 0) {
+            let minDistance = Infinity;
+            features.forEach(eq => {
+                if (!isNaN(eq.lat) && !isNaN(eq.lng)) {
+                    let d = getDistance(userLocation.lat, userLocation.lng, eq.lat, eq.lng);
+                    if (d < minDistance) { minDistance = d; closestEqId = eq.id; }
+                }
+            });
+        }
+
+        const fragment = document.createDocumentFragment();
+        const nowMs = Date.now();
+
+        // Cluster grup oluştur
+        if (clusterEnabled) {
+            markerClusterGroup = L.markerClusterGroup({
+                maxClusterRadius: 50,
+                spiderfyOnMaxZoom: true,
+                showCoverageOnHover: false,
+                iconCreateFunction: function(cluster) {
+                    const childCount = cluster.getChildCount();
+                    const childMarkers = cluster.getAllChildMarkers();
+                    const maxMag = Math.max(...childMarkers.map(m => m._eqMag || 0));
+                    let cls = ' marker-cluster-small';
+                    if (maxMag >= 5.0) cls = ' marker-cluster-large';
+                    else if (maxMag >= 3.0) cls = ' marker-cluster-medium';
+                    return new L.DivIcon({ html: `<div><span>${childCount}</span></div>`, className: 'marker-cluster' + cls, iconSize: new L.Point(40, 40) });
+                }
+            });
+        }
+
+        const circleMarkers = [];
+
+        features.slice(0, 80).forEach((eq) => { 
+            const mag = (eq.mag || 0).toFixed(1);
+            const color = getColor(eq.mag);
+            const intensity = getIntensity(eq.mag);
+            const formattedTime = formatDate(eq.time);
+            const isFresh = (nowMs - eq.time) < (15 * 60 * 1000); 
+
+            let extraTagsHtml = '';
+            if (isFresh) extraTagsHtml += `<span class="eq-badge-new">✨ YENİ</span>`;
+            if (userLocation) {
+                const dist = getDistance(userLocation.lat, userLocation.lng, eq.lat, eq.lng);
+                extraTagsHtml += `<span class="eq-distance">🎯 Sana: ${dist.toFixed(0)} km</span>`;
+            }
+            if (eq.id === closestEqId) extraTagsHtml += `<span class="eq-closest">📍 En Yakın</span>`;
+            if (eq.mag >= 6.5) extraTagsHtml += `<span class="eq-risk-danger">🌊 Tsunami Riski</span>`;
+            else if (eq.mag >= 5.5) extraTagsHtml += `<span class="eq-risk-warning">⚠️ Hasar Riski</span>`;
+
+            const card = document.createElement('div');
+            card.className = `eq-card ${isFresh ? 'eq-new' : ''}`;
+            card.style.borderLeft = `4px solid ${color}`;
+            card.onclick = () => { flyToLocation(eq.lat, eq.lng); openDetail(eq); };
+            card.innerHTML = `
+                <div class="eq-mag" style="color: ${color}">${mag}</div>
+                <div class="eq-details">
+                    <div class="eq-place" title="${eq.place}">${eq.place}</div>
+                    <div class="eq-meta">
+                        <span class="eq-source">${eq.source}</span>
+                        <span>${formattedTime}</span>
+                        <span class="eq-depth">⏬ ${eq.depth.toFixed(1)} km</span>
+                        ${eq.mag >= 4.0 ? `<span class="eq-intensity">Şiddet: ${intensity.split(' ')[1]}</span>` : ''}
+                        ${extraTagsHtml}
+                    </div>
+                </div>
+            `;
+            fragment.appendChild(card);
+
+            if (isNaN(eq.lat) || isNaN(eq.lng) || eq.lat === 0 || eq.lng === 0) return;
+
+            const validMag = eq.mag > 0 ? eq.mag : 1;
+            const radius = Math.max((validMag ** 2) * 1200, 10000); 
+            
+            let popupDistance = userLocation ? `<div class="popup-row"><span>Sana Uzaklık:</span> <span class="popup-val" style="color:var(--warning)">${getDistance(userLocation.lat, userLocation.lng, eq.lat, eq.lng).toFixed(1)} km</span></div>` : '';
+            const popupContent = `
+                <div style="min-width: 180px;">
+                    <div style="text-align:center; margin-bottom:12px;">
+                        <b style="font-size:28px; color:${color}; line-height:1; text-shadow: 0 2px 10px rgba(0,0,0,0.5);">${mag}</b>
+                    </div>
+                    <div class="popup-title">${eq.place}</div>
+                    <div class="popup-row"><span>Derinlik:</span> <span class="popup-val">${eq.depth.toFixed(1)} km</span></div>
+                    <div class="popup-row"><span>Tahmini Şiddet:</span> <span class="popup-val" style="color:#c084fc;">${intensity}</span></div>
+                    <div class="popup-row"><span>Kaynak:</span> <span class="popup-val">${eq.source}</span></div>
+                    <div class="popup-row"><span>Tarih:</span> <span class="popup-val">${formattedTime}</span></div>
+                    ${popupDistance}
+                    <button class="popup-share-btn" onclick="shareEq('${eq.place.replace(/'/g, "\\'")}', '${mag}', '${formattedTime}')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg> 
+                        Hızlı Paylaş
+                    </button>
+                </div>
+            `;
+
+            if (currentMapMode === 'heat') {
+                // Isı haritası modu — marker ekleme, sadece heatmap
+                // (Heatmap features.length sonrasında toplu eklenir)
+            } else if (currentMapMode === 'pins' && clusterEnabled) {
+                // Cluster modunda pin marker kullan
+                const pinIcon = L.divIcon({
+                    html: `<div style="background:${color}; width:${Math.max(8, validMag*4)}px; height:${Math.max(8, validMag*4)}px; border-radius:50%; border:2px solid rgba(255,255,255,0.6); box-shadow:0 0 ${validMag*3}px ${color}; opacity:0.9;"></div>`,
+                    className: '', iconAnchor: [Math.max(4, validMag*2), Math.max(4, validMag*2)]
+                });
+                const pinMarker = L.marker([eq.lat, eq.lng], { icon: pinIcon });
+                pinMarker._eqMag = eq.mag;
+                pinMarker.bindPopup(popupContent);
+                markerClusterGroup.addLayer(pinMarker);
+            } else {
+                // Daire modu (circles) veya cluster kapalı pins
+                const marker = L.circle([eq.lat, eq.lng], {
+                    radius: radius, fillColor: color, color: color, weight: 2, opacity: 0.8, fillOpacity: 0.4
+                }).addTo(map);
+                marker.bindPopup(popupContent);
+                mapMarkers.push(marker);
+
+                if (eq.mag >= 4.0) {
+                    const feltRadius = (eq.mag ** 2) * 4500;
+                    const feltMarker = L.circle([eq.lat, eq.lng], {
+                        radius: feltRadius, fillColor: color, color: color, weight: 1, opacity: 0.3, fillOpacity: 0.05, dashArray: '5, 5'
+                    }).addTo(map);
+                    mapMarkers.push(feltMarker);
+                }
+            }
+        });
+
+        if (currentMapMode === 'heat') {
+            // Isı haritası katmanı (tüm verilerle)
+            const heatData = features
+                .filter(eq => !isNaN(eq.lat) && !isNaN(eq.lng) && eq.lat !== 0)
+                .map(eq => [eq.lat, eq.lng, Math.min(1, (eq.mag || 1) / 7)]);
+            if (window.L.heatLayer) {
+                heatLayer = L.heatLayer(heatData, { radius: 35, blur: 25, maxZoom: 10, max: 1.0,
+                    gradient: { 0.2: '#10b981', 0.4: '#f59e0b', 0.6: '#f97316', 0.8: '#ef4444', 1.0: '#a855f7' }
+                }).addTo(map);
+            }
+        } else if (currentMapMode === 'pins' && clusterEnabled && markerClusterGroup) {
+            map.addLayer(markerClusterGroup);
+        }
+
+        if (features.length > 80) {
+            const footer = document.createElement('div');
+            footer.style.textAlign = 'center'; footer.style.padding = '15px';
+            footer.style.color = 'var(--text-muted)'; footer.style.fontSize = '12px'; footer.style.fontWeight = 'bold';
+            footer.innerText = `...ve ${features.length - 80} eski kayıt performans için gizlendi.`;
+            fragment.appendChild(footer);
+        }
+
+        eqListEl.appendChild(fragment);
+        if (!isInit) eqListEl.scrollTop = previousScroll;
+    }
+
+    // --- APİ ÇEKME & GÜVENLİK FİLTRESİ ---
+    async function fetchEarthquakes(isInit = false) {
+        try {
+            document.getElementById('statusText').innerText = "Veri Çekiliyor...";
+            document.getElementById('statusDot').style.backgroundColor = "var(--warning)";
+            document.getElementById('statusDot').style.boxShadow = "0 0 12px var(--warning)";
+
+            const timeFilter = timeSpanSelect.value;
+            let usgsEndpoint = 'all_day.geojson';
+            if(timeFilter === 'all_hour') usgsEndpoint = 'all_hour.geojson';
+            if(timeFilter === 'all_week') usgsEndpoint = 'all_week.geojson';
+
+            // 5 Farklı Güvenilir Kaynaktan Veri Çekimi
+            const[usgsRes, bdtimRes, afadRes, emscRes, geonetRes] = await Promise.allSettled([
+                fetch(`https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/${usgsEndpoint}`).then(r=>r.json()),
+                fetch('https://api.orhanaydogdu.com.tr/deprem/kandilli/live?limit=200').then(r=>r.json()),
+                fetch('https://api.orhanaydogdu.com.tr/deprem/afad/live?limit=200').then(r=>r.json()),
+                fetch('https://www.seismicportal.eu/fdsnws/event/1/query?limit=200&format=json').then(r=>r.json()),
+                fetch('https://api.geonet.org.nz/quake?MMI=-1').then(r=>r.json())
+            ]);
+
+            let allEqs =[];
+
+            const parseData = (res, sourceName) => {
+                if (res.status !== 'fulfilled' || !res.value) return[];
+                
+                let data =[];
+                if (sourceName === 'USGS' || sourceName === 'EMSC' || sourceName === 'GEONET') {
+                    data = res.value.features ||[];
+                } else {
+                    data = res.value.result ||[];
+                }
+
+                if (!Array.isArray(data)) return[];
+
+                return data.map(f => {
+                    try {
+                        let lat, lng, id, mag, place, time, depth;
+
+                        if (sourceName === 'USGS') {
+                            lat = parseFloat(f.geometry?.coordinates?.[1]);
+                            lng = parseFloat(f.geometry?.coordinates?.[0]);
+                            id = 'U_' + f.id;
+                            mag = parseFloat(f.properties.mag) || 0;
+                            place = translatePlace(f.properties.place);
+                            time = f.properties.time; 
+                            depth = parseFloat(f.geometry?.coordinates?.[2] || 0);
+                        } 
+                        else if (sourceName === 'EMSC') {
+                            lat = parseFloat(f.geometry?.coordinates?.[1]);
+                            lng = parseFloat(f.geometry?.coordinates?.[0]);
+                            id = 'E_' + (f.properties.unid || f.id);
+                            mag = parseFloat(f.properties.mag) || 0;
+                            place = titleCase(translatePlace(f.properties.flynn_region || f.properties.region || "Bilinmeyen Konum"));
+                            time = parseApiDate(f.properties.time); 
+                            depth = parseFloat(f.properties.depth || f.geometry?.coordinates?.[2] || 0);
+                        } 
+                        else if (sourceName === 'GEONET') {
+                            lat = parseFloat(f.geometry?.coordinates?.[1]);
+                            lng = parseFloat(f.geometry?.coordinates?.[0]);
+                            id = 'G_' + (f.properties.publicID || f.id);
+                            mag = parseFloat(f.properties.magnitude) || 0;
+                            place = titleCase(translatePlace(f.properties.locality || "Yeni Zelanda"));
+                            time = parseApiDate(f.properties.time);
+                            depth = parseFloat(f.properties.depth || f.geometry?.coordinates?.[2] || 0);
+                        } 
+                        else {
+                            lat = parseFloat(f.geojson?.coordinates?.[1] ?? f.lat ?? f.latitude);
+                            lng = parseFloat(f.geojson?.coordinates?.[0] ?? f.lng ?? f.longitude);
+                            id = sourceName.charAt(0) + '_' + (f.earthquake_id || f._id || `${f.date}-${f.mag}`); 
+                            mag = parseFloat(f.mag) || 0; 
+                            place = titleCase(f.title || "Bilinmeyen Konum"); 
+                            time = parseApiDate(f.date); 
+                            depth = parseFloat(f.depth || 0);
+                        }
+
+                        return { id, source: sourceName, mag, place, time, depth, lat, lng };
+                    } catch (e) { return null; }
+                }).filter(e => e !== null && !isNaN(e.lat) && !isNaN(e.lng) && e.lat !== 0 && e.lng !== 0);
+            };
+
+            // Parse ve Birleştirme
+            allEqs.push(...parseData(bdtimRes, 'BDTIM'));
+            allEqs.push(...parseData(afadRes, 'AFAD'));
+            allEqs.push(...parseData(usgsRes, 'USGS'));
+            allEqs.push(...parseData(emscRes, 'EMSC'));
+            allEqs.push(...parseData(geonetRes, 'GEONET'));
+
+            const now = Date.now();
+            if(timeFilter === 'all_hour') allEqs = allEqs.filter(e => (now - e.time) < 3600000);
+            else if (timeFilter === 'all_day') allEqs = allEqs.filter(e => (now - e.time) < 86400000);
+            else if (timeFilter === 'all_week') allEqs = allEqs.filter(e => (now - e.time) < 604800000);
+
+            // BÖLGESEL FİLTRELEME
+            const regVal = regionSelect.value;
+            if(regionBounds[regVal]) {
+                const bounds = regionBounds[regVal];
+                allEqs = allEqs.filter(e => e.lat >= bounds.minLat && e.lat <= bounds.maxLat && e.lng >= bounds.minLng && e.lng <= bounds.maxLng);
+            } else if (regVal === 'local' && userLocation) {
+                allEqs = allEqs.filter(e => getDistance(userLocation.lat, userLocation.lng, e.lat, e.lng) <= 200);
+            }
+
+            // METİN ARAMA FİLTRESİ
+            const searchVal = searchInput.value.trim().toLowerCase();
+            if (searchVal) {
+                allEqs = allEqs.filter(e => e.place.toLowerCase().includes(searchVal));
+            }
+
+            // KAYNAK FİLTRESİ
+            const sFilter = sourceSelect.value;
+            if(sFilter !== 'all') allEqs = allEqs.filter(e => e.source.toLowerCase().includes(sFilter));
+
+            // YENİ EKLENTİ: Gelişmiş Sıralama
+            const sortMethod = sortSelect.value;
+            if(sortMethod === 'mag') {
+                allEqs.sort((a,b) => b.mag - a.mag);
+            } else if (sortMethod === 'dist' && userLocation) {
+                allEqs.sort((a,b) => getDistance(userLocation.lat, userLocation.lng, a.lat, a.lng) - getDistance(userLocation.lat, userLocation.lng, b.lat, b.lng));
+            } else {
+                allEqs.sort((a,b) => b.time - a.time);
+            }
+
+            // MÜKERRER DEPREM BİRLEŞTİRİCİSİ
+            let deduplicated =[];
+            for (let eq of allEqs) {
+                let existing = deduplicated.find(u => Math.abs(u.time - eq.time) < 60000 && getDistance(u.lat, u.lng, eq.lat, eq.lng) < 50);
+                if (!existing) { deduplicated.push({ ...eq, mergedIds:[eq.id] }); } 
+                else {
+                    if(!existing.source.includes(eq.source)) {
+                        existing.source += ' & ' + eq.source; // Kaynak etiketlerini birleştir
+                        existing.mag = Math.max(existing.mag, eq.mag);
+                        existing.mergedIds.push(eq.id);
+                    }
+                }
+            }
+
+            let newEqs =[];
+            for(let eq of deduplicated) {
+                let isSeen = eq.mergedIds.some(id => seenIds.has(id));
+                if(!isSeen && !isInit) newEqs.push(eq);
+                eq.mergedIds.forEach(id => seenIds.add(id));
+            }
+            // Bellek sınırı: set çok büyürse temizle
+            if (seenIds.size > MAX_SEEN_IDS) {
+                const arr = Array.from(seenIds);
+                seenIds = new Set(arr.slice(arr.length - MAX_SEEN_IDS));
+            }
+
+            renderData(deduplicated, isInit);
+
+            if(!isInit && newEqs.length > 0) {
+                const threshold = parseFloat(minMagInput.value);
+                let alarmingEqs = newEqs.filter(e => e.mag >= threshold);
+
+                // Bölge bazlı alarm filtresi
+                const regionAlarmOn = document.getElementById('regionAlarmCheck').checked;
+                if (regionAlarmOn) {
+                    const regVal = regionSelect.value;
+                    if (regionBounds[regVal]) {
+                        const bounds = regionBounds[regVal];
+                        alarmingEqs = alarmingEqs.filter(e => e.lat >= bounds.minLat && e.lat <= bounds.maxLat && e.lng >= bounds.minLng && e.lng <= bounds.maxLng);
+                    } else if (regVal === 'local' && userLocation) {
+                        alarmingEqs = alarmingEqs.filter(e => getDistance(userLocation.lat, userLocation.lng, e.lat, e.lng) <= 200);
+                    }
+                    // regVal === 'all' ise filtre yok
+                }
+
+                if(alarmingEqs.length > 0) {
+                    const topEq = alarmingEqs.sort((a,b) => b.mag - a.mag)[0];
+                    triggerAlarm(topEq);
+                    speakEarthquake(topEq);
+                    sendEqNotification(topEq);
+                }
+                // Alarm eşiğine ulaşmayan yeni depremlere de bildirim gönder (sessiz)
+                const subThresholdNew = newEqs.filter(e => e.mag < parseFloat(minMagInput.value) && e.mag >= 2.5);
+                subThresholdNew.forEach(eq => sendEqNotification(eq));
+            }
+            
+            document.getElementById('statusText').innerText = "Sensörler Aktif";
+            document.getElementById('statusText').style.color = "var(--text-muted)";
+            document.getElementById('statusDot').style.backgroundColor = "var(--success)";
+            document.getElementById('statusDot').style.boxShadow = "0 0 12px var(--success)";
+
+        } catch(err) {
+            console.error("MuGöl Tespit Hatası:", err);
+            if(isInit) eqListEl.innerHTML = '<div style="text-align:center; padding:30px; color:var(--danger); font-weight:800;">Bağlantı Sorunu, Veriler Tekrar Deneniyor...</div>';
+            document.getElementById('statusText').innerText = "Bağlantı Koptu, Yeniden Deneniyor...";
+            document.getElementById('statusText').style.color = "var(--danger)";
+            document.getElementById('statusDot').style.backgroundColor = "var(--danger)";
+            document.getElementById('statusDot').style.boxShadow = "0 0 12px var(--danger)";
+        }
+    }
+
+    // --- YENİLEME ÇUBUĞU (PROGRESS BAR) ---
+    let progress = 0;
+    const updateInterval = 60000;
+    
+    function startProgress() {
+        const bar = document.getElementById('progressBar');
+        setInterval(() => {
+            progress += 1000;
+            const percentage = (progress / updateInterval) * 100;
+            bar.style.width = percentage + '%';
+            
+            if (progress >= updateInterval) {
+                progress = 0;
+                bar.style.width = '0%';
+                fetchEarthquakes(false);
+            }
+        }, 1000);
+    }
+
+    window.onload = () => {
+        fetchEarthquakes(true);
+        startProgress();
+        initNotifPermUI();
+    };
+
+</script>
+</body>
+</html>
