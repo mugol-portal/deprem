@@ -963,8 +963,12 @@
     };
 
     // --- HARİTA SİSTEMİ (LEAFLET) ---
-    const map = L.map('map', { zoomControl: false }).setView(regionBounds.tr.center, regionBounds.tr.zoom);
+    const map = L.map('map', { zoomControl: false, preferCanvas: true }).setView(regionBounds.tr.center, regionBounds.tr.zoom);
     L.control.zoom({ position: 'topleft' }).addTo(map);
+    // Mobilde siyah ekran sorununu önle
+    setTimeout(() => map.invalidateSize(), 200);
+    setTimeout(() => map.invalidateSize(), 800);
+    window.addEventListener('resize', () => setTimeout(() => map.invalidateSize(), 200));
 
     const darkMap = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: 'MuGöl Radar' }).addTo(map);
     const satelliteMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
@@ -1065,10 +1069,8 @@
 
     function parseApiDate(dateStr) {
         if (!dateStr) return Date.now();
-        // Sayısal timestamp (ms) - USGS ve bazı API'ler bu şekilde döner
-        if (typeof dateStr === 'number') {
-            return dateStr > 1e12 ? dateStr : dateStr * 1000; // saniye mi ms mi?
-        }
+        // USGS ve bazı API'ler zaman damgasını sayı (ms) olarak gönderir
+        if (typeof dateStr === 'number') return dateStr > 1e12 ? dateStr : dateStr * 1000;
         const str = String(dateStr).trim();
         if (str.includes('T') || str.includes('Z') || str.includes('+')) {
             const d = new Date(str);
@@ -1077,7 +1079,7 @@
         let cleanDate = str.replace(/\./g, '-');
         const parts = cleanDate.split(' ');
         if (parts.length === 2) {
-            const iso = `${parts[0]}T${parts[1]}+03:00`; 
+            const iso = `${parts[0]}T${parts[1]}+03:00`;
             const d = new Date(iso);
             if (!isNaN(d.getTime())) return d.getTime();
         }
@@ -1704,106 +1706,126 @@
             if(timeFilter === 'all_hour') usgsEndpoint = 'all_hour.geojson';
             if(timeFilter === 'all_week') usgsEndpoint = 'all_week.geojson';
 
+            // CORS-güvenli veri çekme: USGS doğrudan, diğerleri proxy üzerinden
+            const safeFetch = async (url, useProxy) => {
+                if (!useProxy) {
+                    const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.json();
+                }
+                // Önce allorigins dene, başarısız olursa corsproxy dene
+                const proxies = [
+                    'https://api.allorigins.win/get?url=' + encodeURIComponent(url),
+                    'https://corsproxy.io/?' + encodeURIComponent(url)
+                ];
+                for (var i = 0; i < proxies.length; i++) {
+                    try {
+                        var r = await fetch(proxies[i], { signal: AbortSignal.timeout(12000) });
+                        if (!r.ok) continue;
+                        var json = await r.json();
+                        // allorigins: { contents: "json_string" }
+                        if (json && typeof json.contents === 'string') return JSON.parse(json.contents);
+                        // corsproxy veya direkt json
+                        if (json && (json.features || json.result || json.data || json.quakes)) return json;
+                    } catch(e) { console.warn('Proxy hata:', proxies[i], e.message); }
+                }
+                throw new Error('Tüm proxy başarısız: ' + url);
+            };
+
             // 5 Farklı Güvenilir Kaynaktan Veri Çekimi
             const[usgsRes, bdtimRes, afadRes, emscRes, geonetRes] = await Promise.allSettled([
-                fetch(`https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/${usgsEndpoint}`).then(r=>r.json()),
-                fetch('https://api.orhanaydogdu.com.tr/deprem/kandilli/live?limit=200').then(r=>r.json()),
-                fetch('https://api.orhanaydogdu.com.tr/deprem/afad/live?limit=200').then(r=>r.json()),
-                // EMSC: GeoJSON formatında döner, format=json yerine doğru endpoint
-                fetch('https://www.seismicportal.eu/fdsnws/event/1/query?limit=150&format=geojson&minmagnitude=1').then(r=>r.json()),
-                // GeoNet: quakes dizisini direkt döner
-                fetch('https://api.geonet.org.nz/quake?MMI=-1').then(r=>r.json())
+                safeFetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/' + usgsEndpoint, false),
+                safeFetch('https://api.orhanaydogdu.com.tr/deprem/kandilli/live?limit=200', true),
+                safeFetch('https://api.orhanaydogdu.com.tr/deprem/afad/live?limit=200', true),
+                safeFetch('https://www.seismicportal.eu/fdsnws/event/1/query?limit=150&format=geojson&minmagnitude=1', true),
+                safeFetch('https://api.geonet.org.nz/quake?MMI=-1', true)
             ]);
 
             let allEqs =[];
 
             const parseData = (res, sourceName) => {
-                if (res.status !== 'fulfilled' || !res.value) return[];
-                
-                let data =[];
+                if (res.status !== 'fulfilled' || !res.value) {
+                    console.warn(sourceName + ' başarısız:', res.reason || 'boş yanıt');
+                    return [];
+                }
+
+                var raw = res.value;
+                var data = [];
+
                 if (sourceName === 'USGS' || sourceName === 'EMSC') {
-                    data = res.value.features ||[];
+                    data = raw.features || [];
                 } else if (sourceName === 'GEONET') {
-                    // GeoNet /quake endpoint: { quakes: [...] }
-                    // Her quake nesnesi doğrudan özellikleri içerir (properties alt nesnesi yok)
-                    data = res.value.quakes || res.value.features ||[];
+                    data = raw.quakes || raw.features || [];
                 } else {
-                    // BDTIM / AFAD: { result: [...] } veya { data: [...] } veya { result: { data: [...] } }
-                    const raw = res.value;
+                    // BDTIM / AFAD: { result: [...] } veya { data: [...] }
                     data = raw.result || raw.data || [];
-                    // result bir obje ise (pagination wrapper), içindeki data'ya bak
-                    if (!Array.isArray(data) && data.data) data = data.data;
+                    if (!Array.isArray(data) && data && data.data) data = data.data;
                     if (!Array.isArray(data)) data = [];
                 }
 
-                if (!Array.isArray(data)) return[];
+                if (!Array.isArray(data) || data.length === 0) {
+                    console.warn(sourceName + ' veri boş');
+                    return [];
+                }
 
-                return data.map(f => {
+                console.log(sourceName + ': ' + data.length + ' kayıt');
+
+                return data.map(function(f) {
                     try {
-                        let lat, lng, id, mag, place, time, depth;
+                        var lat, lng, id, mag, place, time, depth;
 
                         if (sourceName === 'USGS') {
-                            lat = parseFloat(f.geometry?.coordinates?.[1]);
-                            lng = parseFloat(f.geometry?.coordinates?.[0]);
-                            id = 'U_' + f.id;
-                            mag = parseFloat(f.properties.mag) || 0;
+                            lat   = parseFloat(f.geometry && f.geometry.coordinates && f.geometry.coordinates[1]);
+                            lng   = parseFloat(f.geometry && f.geometry.coordinates && f.geometry.coordinates[0]);
+                            id    = 'U_' + f.id;
+                            mag   = parseFloat(f.properties.mag) || 0;
                             place = translatePlace(f.properties.place);
-                            // USGS time zaten milisaniye cinsinden sayı olarak gelir
-                            time = typeof f.properties.time === 'number' ? f.properties.time : parseApiDate(f.properties.time);
-                            depth = parseFloat(f.geometry?.coordinates?.[2] || 0);
-                        } 
+                            // USGS time sayısal ms olarak gelir
+                            time  = typeof f.properties.time === 'number' ? f.properties.time : parseApiDate(f.properties.time);
+                            depth = parseFloat((f.geometry && f.geometry.coordinates && f.geometry.coordinates[2]) || 0);
+                        }
                         else if (sourceName === 'EMSC') {
-                            lat = parseFloat(f.geometry?.coordinates?.[1]);
-                            lng = parseFloat(f.geometry?.coordinates?.[0]);
-                            id = 'E_' + (f.properties?.unid || f.properties?.evid || f.id);
-                            mag = parseFloat(f.properties?.mag || f.properties?.magnitude) || 0;
-                            place = titleCase(translatePlace(f.properties?.flynn_region || f.properties?.region || f.properties?.place || "Bilinmeyen Konum"));
-                            // EMSC time ISO string olarak gelir
-                            time = parseApiDate(f.properties?.time || f.properties?.origintime); 
-                            depth = parseFloat(f.properties?.depth || f.geometry?.coordinates?.[2] || 0);
-                        } 
+                            lat   = parseFloat(f.geometry && f.geometry.coordinates && f.geometry.coordinates[1]);
+                            lng   = parseFloat(f.geometry && f.geometry.coordinates && f.geometry.coordinates[0]);
+                            id    = 'E_' + ((f.properties && (f.properties.unid || f.properties.evid)) || f.id);
+                            mag   = parseFloat((f.properties && (f.properties.mag || f.properties.magnitude)) || 0) || 0;
+                            place = titleCase(translatePlace((f.properties && (f.properties.flynn_region || f.properties.region || f.properties.place)) || "Bilinmeyen Konum"));
+                            time  = parseApiDate(f.properties && (f.properties.time || f.properties.origintime));
+                            depth = parseFloat((f.properties && f.properties.depth) || (f.geometry && f.geometry.coordinates && f.geometry.coordinates[2]) || 0);
+                        }
                         else if (sourceName === 'GEONET') {
-                            // GeoNet /quake endpoint: quake nesneleri doğrudan lat/lng/depth içerir
-                            // geometry.coordinates yoksa fallback olarak doğrudan alandan al
-                            if (f.geometry?.coordinates) {
-                                lat = parseFloat(f.geometry.coordinates[1]);
-                                lng = parseFloat(f.geometry.coordinates[0]);
-                                depth = parseFloat(f.properties?.depth ?? f.geometry.coordinates[2] ?? 0);
+                            // GeoNet /quake: nesneler doğrudan lat/lng/depth içerebilir
+                            if (f.geometry && f.geometry.coordinates) {
+                                lat   = parseFloat(f.geometry.coordinates[1]);
+                                lng   = parseFloat(f.geometry.coordinates[0]);
+                                depth = parseFloat((f.properties && f.properties.depth) || f.geometry.coordinates[2] || 0);
                             } else {
-                                lat = parseFloat(f.latitude ?? f.lat ?? 0);
-                                lng = parseFloat(f.longitude ?? f.lng ?? 0);
-                                depth = parseFloat(f.depth ?? 0);
+                                lat   = parseFloat(f.latitude || f.lat || 0);
+                                lng   = parseFloat(f.longitude || f.lng || 0);
+                                depth = parseFloat(f.depth || 0);
                             }
-                            id = 'G_' + (f.properties?.publicID || f.publicID || f.quakeID || f.id);
-                            mag = parseFloat(f.properties?.magnitude ?? f.magnitude) || 0;
-                            place = titleCase(translatePlace(f.properties?.locality ?? f.locality || "Yeni Zelanda"));
-                            time = parseApiDate(f.properties?.time ?? f.time);
-                        } 
+                            id    = 'G_' + ((f.properties && f.properties.publicID) || f.publicID || f.quakeID || f.id);
+                            mag   = parseFloat((f.properties && f.properties.magnitude) || f.magnitude || 0) || 0;
+                            place = titleCase(translatePlace((f.properties && f.properties.locality) || f.locality || "Yeni Zelanda"));
+                            time  = parseApiDate((f.properties && f.properties.time) || f.time);
+                        }
                         else {
-                            // BDTIM / AFAD (orhanaydogdu.com.tr)
-                            // Koordinatlar geojson içinde veya doğrudan alanda olabilir
-                            lat = parseFloat(f.geojson?.coordinates?.[1] ?? f.lat ?? f.latitude ?? 0);
-                            lng = parseFloat(f.geojson?.coordinates?.[0] ?? f.lng ?? f.longitude ?? 0);
-                            id = sourceName.charAt(0) + '_' + (f.earthquake_id || f._id || f.id || `${f.date}-${f.mag}`); 
-                            mag = parseFloat(f.mag || f.ml || f.mw) || 0; 
-                            place = titleCase(translatePlace(f.title || f.location || f.lokasyon || "Bilinmeyen Konum")); 
-                            time = parseApiDate(f.date || f.datetime); 
+                            // BDTIM / AFAD
+                            lat   = parseFloat((f.geojson && f.geojson.coordinates && f.geojson.coordinates[1]) || f.lat || f.latitude || 0);
+                            lng   = parseFloat((f.geojson && f.geojson.coordinates && f.geojson.coordinates[0]) || f.lng || f.longitude || 0);
+                            id    = sourceName.charAt(0) + '_' + (f.earthquake_id || f._id || f.id || (f.date + '-' + f.mag));
+                            mag   = parseFloat(f.mag || f.ml || f.mw || 0) || 0;
+                            place = titleCase(translatePlace(f.title || f.location || f.lokasyon || "Bilinmeyen Konum"));
+                            time  = parseApiDate(f.date || f.datetime);
                             depth = parseFloat(f.depth || f.derinlik || 0);
                         }
 
                         return { id, source: sourceName, mag, place, time, depth, lat, lng };
                     } catch (e) { return null; }
-                }).filter(e => e !== null && !isNaN(e.lat) && !isNaN(e.lng) && e.lat !== 0 && e.lng !== 0);
+                }).filter(function(e) { return e !== null && !isNaN(e.lat) && !isNaN(e.lng) && e.lat !== 0 && e.lng !== 0; });
             };
 
             // Parse ve Birleştirme
-            // Geliştirici konsolunda kaynak durumlarını takip et
-            console.log('USGS:', usgsRes.status, usgsRes.value?.features?.length ?? 'ERR');
-            console.log('BDTIM:', bdtimRes.status, (bdtimRes.value?.result || bdtimRes.value?.data)?.length ?? 'ERR');
-            console.log('AFAD:', afadRes.status, (afadRes.value?.result || afadRes.value?.data)?.length ?? 'ERR');
-            console.log('EMSC:', emscRes.status, emscRes.value?.features?.length ?? 'ERR');
-            console.log('GeoNet:', geonetRes.status, geonetRes.value?.quakes?.length ?? 'ERR');
-
             allEqs.push(...parseData(bdtimRes, 'BDTIM'));
             allEqs.push(...parseData(afadRes, 'AFAD'));
             allEqs.push(...parseData(usgsRes, 'USGS'));
@@ -1845,13 +1867,9 @@
             }
 
             // MÜKERRER DEPREM BİRLEŞTİRİCİSİ
-            // Aynı anda (±2 dakika) ve yakın yerde (50 km) olan depremler farklı kaynaklardan gelen aynı depremin tekrarıdır
             let deduplicated =[];
             for (let eq of allEqs) {
-                let existing = deduplicated.find(u => 
-                    Math.abs(u.time - eq.time) < 120000 &&  // 2 dakika tolerans
-                    getDistance(u.lat, u.lng, eq.lat, eq.lng) < 50
-                );
+                let existing = deduplicated.find(u => Math.abs(u.time - eq.time) < 60000 && getDistance(u.lat, u.lng, eq.lat, eq.lng) < 50);
                 if (!existing) { deduplicated.push({ ...eq, mergedIds:[eq.id] }); } 
                 else {
                     if(!existing.source.includes(eq.source)) {
@@ -1942,6 +1960,7 @@
         fetchEarthquakes(true);
         startProgress();
         initNotifPermUI();
+        setTimeout(() => map.invalidateSize(), 400);
     };
 
 </script>
